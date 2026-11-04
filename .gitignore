@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+dist/
+*.log
+.env*
+!.env.example
+jarvis-server-settings.json
+tsconfig.tsbuildinfo
+social-captures/
