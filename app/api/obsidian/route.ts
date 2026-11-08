@@ -157,6 +157,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, file: path.relative(vault, file) });
       }
 
+      case 'write': {
+        // Write/update any text file inside the vault (confined).
+        const file = safeVaultFile(String(a.file ?? ''));
+        if (!file) return NextResponse.json({ error: 'Invalid file path.' }, { status: 400 });
+        await fsp.mkdir(path.dirname(file), { recursive: true });
+        await fsp.writeFile(file, String(a.content ?? ''), 'utf8');
+        return NextResponse.json({ ok: true, file: path.relative(vault, file) });
+      }
+
       case 'append': {
         const file = safeVaultFile(String(a.file ?? ''));
         if (!file || !fs.existsSync(file)) return NextResponse.json({ error: 'No such note in the vault.' }, { status: 404 });

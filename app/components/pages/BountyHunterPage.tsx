@@ -17,6 +17,51 @@ import { notify } from '../../lib/notify';
 export function BountyHunterPage({ onNavigateHome }: { onNavigateHome: () => void }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [saving, setSaving] = useState(false);
+  const STATE_FILE = 'BH/bounty-hunter-state.json';
+
+  const vaultPost = (body: Record<string, unknown>) =>
+    fetch('/api/obsidian', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then((r) => r.json() as Promise<{ ok?: boolean; file?: string; content?: string; error?: string }>);
+
+  /** PUSH: local dashboard state → vault (so the other machine can pull it). */
+  const pushToVault = async () => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return false;
+    const raw = win.localStorage.getItem('bounty_hunter_state');
+    if (!raw) { notify('Bounty Hunter', 'Nothing to save yet — the dashboard has no data.', 'warn'); return false; }
+    const res = await vaultPost({ op: 'write', file: STATE_FILE, content: raw });
+    if (!res.ok) { notify('Bounty Hunter', `State push failed: ${res.error ?? 'unknown'}`, 'error', 10000); return false; }
+    return true;
+  };
+
+  /** PULL: vault state → dashboard (restores last week's data on this machine). */
+  const pullFromVault = async (silent = false): Promise<boolean> => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return false;
+    const res = await vaultPost({ op: 'read', file: STATE_FILE });
+    if (res.error || !res.content) {
+      if (!silent) notify('Bounty Hunter', 'No saved state in the vault yet.', 'warn');
+      return false;
+    }
+    try {
+      const stored = JSON.parse(res.content) as { savedAt?: string; state?: unknown };
+      const savedAt = stored.savedAt ?? '';
+      const localAt = win.localStorage.getItem('bounty_hunter_state_saved') ?? '';
+      if (savedAt && savedAt <= localAt && !silent) {
+        notify('Bounty Hunter', 'This machine already has the newest state.', 'info');
+        return false;
+      }
+      const state = stored.state !== undefined ? stored.state : JSON.parse(res.content);
+      win.localStorage.setItem('bounty_hunter_state', JSON.stringify(state));
+      win.localStorage.setItem('bounty_hunter_state_saved', savedAt || new Date().toISOString());
+      win.location.reload();
+      if (!silent) notify('Bounty Hunter', 'Restored from vault — dashboard reloading.', 'success', 8000);
+      return true;
+    } catch (e) {
+      if (!silent) notify('Bounty Hunter', `Vault state unreadable: ${String(e).slice(0, 100)}`, 'error');
+      return false;
+    }
+  };
 
   const saveToVault = async () => {
     const win = iframeRef.current?.contentWindow;
@@ -24,7 +69,8 @@ export function BountyHunterPage({ onNavigateHome }: { onNavigateHome: () => voi
     try {
       const raw = win.localStorage.getItem('bounty_hunter_state');
       if (!raw) {
-        notify('Bounty Hunter', 'Nothing to save yet — the dashboard has no data.', 'warn');
+        // Local empty — pull the other machine's state instead of failing.
+        void pullFromVault();
         return;
       }
       const state = JSON.parse(raw) as {
@@ -62,6 +108,12 @@ export function BountyHunterPage({ onNavigateHome }: { onNavigateHome: () => voi
         }
         lines.push('');
       }
+
+      // Also push the live state itself, so the dashboard can be restored
+      // on the other machine with everything intact.
+      const now = new Date().toISOString();
+      await vaultPost({ op: 'write', file: STATE_FILE, content: JSON.stringify({ savedAt: now, state: JSON.parse(raw) }) });
+      win.localStorage.setItem('bounty_hunter_state_saved', now);
 
       const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '.');
       const title = `BH Results/${stamp}`;
@@ -104,9 +156,16 @@ export function BountyHunterPage({ onNavigateHome }: { onNavigateHome: () => voi
             <button
               onClick={() => void saveToVault()}
               className="px-2.5 py-1 rounded font-mono text-[9px] uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20"
-              title="Save roster + bounty results into the Obsidian vault (synced)"
+              title="Push roster + bounty results into the vault (synced)"
             >
-              {saving ? '✓ Saved to vault' : '💾 Save to vault'}
+              {saving ? '✓ Saved to vault' : '💾 Push to vault'}
+            </button>
+            <button
+              onClick={() => void pullFromVault()}
+              className="px-2.5 py-1 rounded font-mono text-[9px] uppercase tracking-widest bg-white/[0.04] border border-white/[0.12] text-white/60 hover:text-emerald-300 hover:border-emerald-500/40"
+              title="Restore the newest state from the vault (e.g. saved on the other machine)"
+            >
+              ⤓ Pull
             </button>
             <span className="font-mono text-[9px] uppercase tracking-widest text-white/30">
               Local · Vault copy synced
