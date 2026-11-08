@@ -69,9 +69,12 @@ function runToolkit(args: string[], timeoutMs = 300_000): Promise<{ code: number
 /** Candidate PDFs to process: Downloads + league folder root. */
 function listPdfCandidates(league: string): { name: string; path: string; mtime: number }[] {
   const folders = [
+    // The user's drop folder for fresh combined scoresheets (inside the
+    // synced vault), Downloads, and the league folder root.
+    path.dirname(league) ? path.join(path.dirname(league), 'combine scoresheets') : '',
     path.join(os.homedir(), 'Downloads'),
     ...(league && fs.existsSync(league) ? [league] : []),
-  ];
+  ].filter(Boolean);
   const seen = new Set<string>();
   const out: { name: string; path: string; mtime: number }[] = [];
   for (const dir of folders) {
