@@ -131,27 +131,67 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const result = await manager.callTool(GOOGLE_CALENDAR_SERVER_NAME, toolName, {
-      timeMin,
-      timeMax,
-      maxResults,
-      calendarId: 'primary',
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
-
-    if (result.isError) {
-      return NextResponse.json(
-        { error: result.content[0]?.text ?? 'MCP tool error', events: [] },
-        { status: 500 },
-      );
+    // All calendars across all connected accounts (multi-account server).
+    let calendars: { id: string; summary: string; backgroundColor?: string; primary?: boolean }[] = [];
+    if (server.tools.some((t) => t.name === 'list-calendars')) {
+      const calResult = await manager.callTool(GOOGLE_CALENDAR_SERVER_NAME, 'list-calendars', {});
+      try {
+        const parsed = JSON.parse(calResult.content.map((c) => c.text ?? '').join('\n'));
+        const list = Array.isArray(parsed) ? parsed : parsed.calendars ?? [];
+        calendars = list.map((c: { id?: string; summary?: string; backgroundColor?: string; primary?: boolean }) => ({
+          id: String(c.id ?? c.summary ?? ''),
+          summary: String(c.summary ?? c.id ?? ''),
+          backgroundColor: c.backgroundColor,
+          primary: Boolean(c.primary),
+        }));
+      } catch { /* fall back to primary below */ }
+    }
+    if (!calendars.length) {
+      calendars = [{ id: 'primary', summary: 'Primary', primary: true }];
     }
 
-    const rawText  = result.content.map((c) => c.text ?? '').join('\n');
-    const rawEvents = parseEventsFromText(rawText);
-    const events    = rawEvents.map(normalizeEvent).filter((e) => e.start);
+    // Which calendars to fetch: the client's selection, or all of them.
+    const requested = searchParams.get('calendarIds');
+    const selected = requested
+      ? calendars.filter((c) => requested.split(',').includes(c.id))
+      : calendars;
+    const fetchTargets = selected.length ? selected : calendars;
 
-    return NextResponse.json({ events, toolUsed: toolName });
+    const events: (ICalEvent & { calendarColor?: string; calendarSummary?: string })[] = [];
+    const failed: string[] = [];
+
+    for (const cal of fetchTargets) {
+      const result = await manager.callTool(GOOGLE_CALENDAR_SERVER_NAME, toolName, {
+        timeMin,
+        timeMax,
+        maxResults,
+        calendarId: cal.id,
+        singleEvents: true,
+        orderBy: 'startTime',
+      });
+
+      if (result.isError) { failed.push(cal.summary); continue; }
+
+      const rawText = result.content.map((c) => c.text ?? '').join('\n');
+      const rawEvents = parseEventsFromText(rawText);
+      for (const ev of rawEvents.map(normalizeEvent).filter((e) => e.start)) {
+        events.push({
+          ...ev,
+          calendarColor: cal.backgroundColor,
+          calendarSummary: cal.summary,
+        });
+      }
+    }
+
+    // Sort merged events chronologically so day-grouping reads naturally.
+    events.sort((a, b) => a.start.localeCompare(b.start));
+
+    return NextResponse.json({
+      events,
+      toolUsed: toolName,
+      calendars,
+      failedCalendars: failed,
+    });
   } catch (err) {
     console.error('[calendar-events] Error:', err);
     return NextResponse.json(

@@ -8,6 +8,9 @@ export interface ICalEvent {
   allDay: boolean;
   description?: string;
   location?: string;
+  /** Present on MCP (Google Calendar) events — which calendar it came from. */
+  calendarColor?: string;
+  calendarSummary?: string;
 }
 
 // Parse a DTSTART/DTEND value into an ISO string

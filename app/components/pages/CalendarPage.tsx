@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ICalEvent } from '../../api/ical/route';
 import { GoogleCalendarWizard } from '../wizards/GoogleCalendarWizard';
@@ -73,6 +73,13 @@ export function CalendarPage({ onNavigateHome }: Props) {
 
   // Google Calendar events state
   const [gcalEvents, setGcalEvents] = useState<GCalEvents>({});
+  const [gcalCalendars, setGcalCalendars] = useState<{ id: string; summary: string; backgroundColor?: string; primary?: boolean }[]>([]);
+  const [selectedCalendars, setSelectedCalendars] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try { return JSON.parse(localStorage.getItem('jarvis_gcal_selected') ?? '[]') as string[]; } catch { return []; }
+  });
+  const selectedCalendarsRef = useRef<string[]>(selectedCalendars);
+  selectedCalendarsRef.current = selectedCalendars;
   const [gcalEventsLoading, setGcalEventsLoading] = useState(false);
   const [gcalEventsError, setGcalEventsError] = useState('');
   // Google Calendar MCP wizard state
@@ -91,19 +98,46 @@ export function CalendarPage({ onNavigateHome }: Props) {
       const timeMin = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
       const timeMax = new Date(now.getFullYear(), now.getMonth() + 4, 0, 23, 59, 59).toISOString();
 
-      const res  = await fetch(`/api/mcp/calendar-events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`);
-      const data = await res.json() as { events?: ICalEvent[]; error?: string };
+      const sel = selectedCalendarsRef.current.join(',');
+      const res  = await fetch(`/api/mcp/calendar-events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}${sel ? `&calendarIds=${encodeURIComponent(sel)}` : ''}`);
+      const data = await res.json() as {
+        events?: (ICalEvent & { calendarColor?: string; calendarSummary?: string })[];
+        calendars?: { id: string; summary: string; backgroundColor?: string; primary?: boolean }[];
+        failedCalendars?: string[];
+        error?: string;
+      };
       if (!res.ok || data.error) {
         setGcalEventsError(data.error ?? 'Could not load Google Calendar events.');
         return;
       }
       setGcalEvents(groupByDate(data.events ?? []));
+      if (data.calendars?.length) {
+        setGcalCalendars(data.calendars);
+        // First load with no saved selection: every calendar is visible.
+        if (!selectedCalendarsRef.current.length) {
+          const ids = data.calendars.map((c) => c.id);
+          selectedCalendarsRef.current = ids;
+          localStorage.setItem('jarvis_gcal_selected', JSON.stringify(ids));
+          setSelectedCalendars(ids);
+        }
+      }
+      setGcalEventsError(data.failedCalendars?.length ? `Could not read: ${data.failedCalendars.join(', ')}` : '');
     } catch {
       setGcalEventsError('Could not load Google Calendar events.');
     } finally {
       setGcalEventsLoading(false);
     }
   }, []);
+
+  // Refetch when the visible-calendar selection changes (skip the very first
+  // render — the config check kicks off the initial fetch itself).
+  const firstSelectionRun = useRef(true);
+  useEffect(() => {
+    if (firstSelectionRun.current) { firstSelectionRun.current = false; return; }
+    if (!gcalCalendars.length) return;
+    localStorage.setItem('jarvis_gcal_selected', JSON.stringify(selectedCalendars));
+    void fetchMcpEvents();
+  }, [selectedCalendars]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if Google Calendar MCP is configured on mount
   useEffect(() => {
@@ -319,6 +353,37 @@ export function CalendarPage({ onNavigateHome }: Props) {
         <div key={i} className={`absolute w-8 h-8 ${cls} border-cyan-500/20 pointer-events-none z-10 m-3`} />
       ))}
 
+      {/* Calendar visibility selector — every connected account's calendars */}
+      {gcalCalendars.length > 1 && (
+        <div className="px-6 pt-2 pb-1 flex flex-wrap items-center gap-1.5 shrink-0">
+          <span className="font-mono text-[9px] uppercase tracking-widest text-white/30 mr-1">Visible:</span>
+          {gcalCalendars.map((cal) => {
+            const on = selectedCalendars.includes(cal.id);
+            const color = cal.backgroundColor || (cal.primary ? '#22d3ee' : '#8ba3b5');
+            return (
+              <button
+                key={cal.id}
+                onClick={() => setSelectedCalendars((prev) =>
+                  prev.includes(cal.id) ? prev.filter((x) => x !== cal.id) : [...prev, cal.id]
+                )}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded font-mono text-[10px] border transition-all ${
+                  on
+                    ? 'bg-white/[0.08] border-white/25 text-white/85'
+                    : 'bg-transparent border-white/[0.08] text-white/30 hover:text-white/60'
+                }`}
+                title={cal.id}
+              >
+                <span
+                  className="w-2 h-2 rounded-full inline-block"
+                  style={{ background: on ? color : 'transparent', border: `1.5px solid ${color}` }}
+                />
+                {cal.summary}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <PageHeader
         title="Calendar"
         onNavigateHome={onNavigateHome}
@@ -439,10 +504,14 @@ export function CalendarPage({ onNavigateHome }: Props) {
                   transition={{ duration: 0.18 }}
                   className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/20 bg-blue-500/[0.06]"
                 >
-                  <div className="mt-1.5 w-2 h-2 shrink-0 rounded-full bg-blue-400/70" />
+                  <div
+                    className="mt-1.5 w-2 h-2 shrink-0 rounded-full"
+                    style={{ background: ev.calendarColor || 'rgba(96,165,250,0.7)' }}
+                    title={ev.calendarSummary}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="text-[9px] font-mono text-blue-400/60 mb-0.5">
-                      {formatEventTime(ev)}{ev.location ? ` · ${ev.location}` : ''} · Google
+                      {formatEventTime(ev)}{ev.location ? ` · ${ev.location}` : ''}{ev.calendarSummary ? ` · ${ev.calendarSummary}` : ' · Google'}
                     </div>
                     <div className="text-[12px] font-mono text-white/75 leading-snug">{ev.title}</div>
                     {ev.description && (
