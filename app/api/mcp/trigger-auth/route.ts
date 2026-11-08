@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn, ChildProcess } from 'child_process';
 import { getGoogleServiceRuntime } from '@/app/lib/mcp/google-service-runtime';
+import { resolveSpawnTarget } from '@/app/lib/mcp/spawn-utils';
 import fs from 'fs';
 
 // Keep the auth process alive between requests so the OAuth callback server
@@ -43,7 +44,10 @@ export async function POST(req: NextRequest) {
   };
 
   return new Promise<Response>((resolve) => {
-    const proc = spawn(service.command, service.authArgs, {
+    // Windows: `npx` is a batch file that spawn() cannot execute — resolve
+    // it to node.exe + npx-cli.js so the auth flow actually starts.
+    const spawnTarget = resolveSpawnTarget(service.command);
+    const proc = spawn(spawnTarget.command, [...spawnTarget.args, ...service.authArgs], {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });

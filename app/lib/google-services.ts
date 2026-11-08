@@ -113,7 +113,10 @@ export const GOOGLE_SERVICES: GoogleServiceDefinition[] = [
       'OAuth client type must be Desktop app.',
     ],
     runtime: {
-      credentialEnvVar: 'GOOGLE_OAUTH_CREDENTIALS',
+      // The @gongrzhe/server-gmail-autoauth-mcp package expects GMAIL_OAUTH_PATH
+      // to point at the client-secret JSON, and saves tokens to GMAIL_CREDENTIALS_PATH.
+      credentialEnvVar: 'GMAIL_OAUTH_PATH',
+      tokenPathEnvVar: 'GMAIL_CREDENTIALS_PATH',
       tokenSubdir: 'gmail-mcp',
       tokenFileName: 'tokens.json',
       xdgConfigHome: true,

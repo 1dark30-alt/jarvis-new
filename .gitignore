@@ -12,3 +12,6 @@ services/.runtime/
 services/gods-eye-view/jarvis-service.log
 .bambu-token.json
 network-devices.json
+
+# Local runtime state (per-machine memory, contains private data)
+jarvis-memory.json

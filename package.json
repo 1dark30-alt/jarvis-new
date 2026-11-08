@@ -55,5 +55,13 @@
     "three-stdlib": "^2.36.1",
     "typescript": "^5",
     "wait-on": "^8.0.0"
+  },
+  "allowScripts": {
+    "@jitsi/robotjs@0.6.24": true,
+    "electron@36.9.5": true,
+    "electron-winstaller@5.4.0": true,
+    "node-hid@3.4.0": true,
+    "protobufjs@7.6.6": true,
+    "sharp@0.34.5": true
   }
 }

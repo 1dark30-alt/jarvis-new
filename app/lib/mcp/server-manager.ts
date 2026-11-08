@@ -16,6 +16,7 @@ import fs from 'fs';
 import os from 'os';
 import { GOOGLE_CALENDAR_SERVER_NAME, JARVIS_DATA_DIR } from './dynamic-config';
 import { getGoogleServiceEnvForServerName } from './google-service-runtime';
+import { resolveSpawnTarget } from './spawn-utils';
 
 // Ensure required env vars are set for specific servers regardless of how they
 // were originally registered (e.g. after an app restart with a saved config).
@@ -155,7 +156,10 @@ export class McpServerManager {
       }
     }
 
-    const proc = spawn(config.command, config.args, {
+    // Windows: `npx` is a batch file that spawn() cannot execute — resolve
+    // it to node.exe + npx-cli.js so we get a real, killable child process.
+    const spawnTarget = resolveSpawnTarget(config.command);
+    const proc = spawn(spawnTarget.command, [...spawnTarget.args, ...config.args], {
       env: env as NodeJS.ProcessEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
