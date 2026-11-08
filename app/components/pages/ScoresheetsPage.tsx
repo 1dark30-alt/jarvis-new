@@ -41,6 +41,11 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
   const [processLog, setProcessLog] = useState('');
   const [pdfList, setPdfList] = useState<{ name: string; path: string; mtime: number }[]>([]);
   const [selectedPdf, setSelectedPdf] = useState('');
+  const [season, setSeason] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('jarvis_apa_season') || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
+  });
+  const [legacyDivisions, setLegacyDivisions] = useState<string[]>([]);
   const [weekSel, setWeekSel] = useState('');
   const [matchSel, setMatchSel] = useState(0);
   const [nexus, setNexus] = useState<NexusState | null>(null);
@@ -50,11 +55,13 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
   const loadConfig = useCallback(async () => {
     const d = await fetch('/api/apa').then((r) => r.json()) as {
       configured?: boolean; league?: string; weeks?: WeekFolder[]; message?: string;
+      legacyDivisions?: string[]; seasons?: string[];
     };
     setConfigured(Boolean(d.configured));
     setLeague(d.league ?? '');
     setLeagueInput(d.league ?? '');
     setWeeks(d.weeks ?? []);
+    setLegacyDivisions(d.legacyDivisions ?? []);
     if (!d.configured && d.message) setError(d.message);
     const p = await fetch('/api/apa?op=list_pdfs').then((r) => r.json()) as { pdfs?: { name: string; path: string; mtime: number }[] };
     setPdfList(p.pdfs ?? []);
@@ -94,7 +101,7 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
     try {
       const d = await fetch('/api/apa', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'process', pdfPath }),
+        body: JSON.stringify({ op: 'process', pdfPath, season }),
       }).then((r) => r.json()) as { ok?: boolean; output?: string; error?: string };
       if (d.error) setError(d.error);
       setProcessLog(d.output ?? d.error ?? '');
@@ -102,6 +109,16 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
     } finally {
       setProcessing(false);
     }
+  };
+
+  const migrate = async () => {
+    setError('');
+    const d = await fetch('/api/apa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'migrate', season }),
+    }).then((r) => r.json()) as { moved?: string[]; error?: string };
+    if (d.error) { setError(d.error); return; }
+    void loadConfig();
   };
 
   const startHelper = async () => {
@@ -154,9 +171,36 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
           </div>
         </div>
 
+        {/* legacy layout migration */}
+        {legacyDivisions.length > 0 && (
+          <div className="rounded-lg p-4 flex items-center justify-between gap-4" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.35)' }}>
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-widest text-amber-300 mb-1">Season layout</div>
+              <p className="text-xs text-white/60">
+                {legacyDivisions.join(', ')} sit at the league root. Move them into season <span className="font-mono text-amber-300">{season}</span>?
+              </p>
+            </div>
+            <button
+              onClick={() => void migrate()}
+              className="px-3 py-2 rounded font-mono text-[10px] uppercase tracking-widest bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 shrink-0"
+            >
+              Move into {season}
+            </button>
+          </div>
+        )}
+
         {/* process PDF */}
         <div className="rounded-lg p-4 space-y-2" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(34,211,238,0.12)' }}>
           <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-cyan-400/70">1 · Pick &amp; process the weekly scoresheets PDF</div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-white/30">Season</span>
+            <input
+              value={season}
+              onChange={(e) => { setSeason(e.target.value); localStorage.setItem('jarvis_apa_season', e.target.value); }}
+              className="bg-black/40 border border-cyan-500/30 rounded px-2 py-1 text-cyan-100 font-mono text-xs w-36"
+            />
+            <span className="text-[10px] text-white/25 font-mono">{'files go to <league>\\<season>\\<division>\\Week N'}</span>
+          </div>
           <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
             {pdfList.length === 0 && <p className="text-xs text-white/35">No PDFs found in Downloads or the league folder.</p>}
             {pdfList.map((p) => (

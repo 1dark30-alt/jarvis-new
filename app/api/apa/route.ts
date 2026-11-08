@@ -20,6 +20,12 @@ export const dynamic = 'force-dynamic';
  */
 
 const PY_EXE = process.env.JARVIS_PYTHON || 'python';
+
+/** Folders inside the league folder that are NOT season folders. */
+const NON_SEASON_DIRS = new Set([
+  'combine scoresheets', 'jarvis memory', 'bh', 'bh results',
+  'conversations', 'apa', 'attachments', 'downloads',
+]);
 const TOOLKIT = path.join(process.cwd(), 'scripts', 'apa_toolkit.py');
 const HELPER = path.join(process.cwd(), 'scripts', 'apa_nexus_helper.py');
 
@@ -138,7 +144,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, league, pdfs: listPdfCandidates(league) });
   }
 
-  return NextResponse.json({ configured: true, league });
+  // Default: everything the page needs on load — weeks AND the legacy-layout
+  // check (division folders sitting at the league root, pre-season layout).
+  let legacyDivisions: string[] = [];
+  let seasons: string[] = [];
+  try {
+    const rootEntries = fs.readdirSync(league, { withFileTypes: true }).filter((e) => e.isDirectory());
+    for (const e of rootEntries) {
+      if (NON_SEASON_DIRS.has(e.name.toLowerCase())) continue;
+      const kids = fs.readdirSync(path.join(league, e.name), { withFileTypes: true });
+      if (kids.some((k) => /^week \d+$/i.test(k.name))) legacyDivisions.push(e.name);
+      else seasons.push(e.name);
+    }
+  } catch { /* league folder unreadable */ }
+
+  return NextResponse.json({
+    configured: true,
+    league,
+    weeks: weekFolders(league),
+    seasons,
+    legacyDivisions,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -161,8 +187,39 @@ export async function POST(req: NextRequest) {
         if (!league) return NextResponse.json({ error: 'Set the league folder first.' }, { status: 400 });
         const pdf = path.resolve(String(a.pdfPath ?? '').trim());
         if (!fs.existsSync(pdf)) return NextResponse.json({ error: `No such file: ${pdf}` }, { status: 404 });
-        const result = await runToolkit(['--cli', pdf, league]);
-        return NextResponse.json({ ok: result.code === 0, output: result.output, code: result.code });
+        // Sheets file into <league>\<season>\<Division>\Week N.
+        const season = String(a.season ?? '').trim() || String(new Date().getFullYear());
+        const seasonRoot = path.join(league, season);
+        fs.mkdirSync(seasonRoot, { recursive: true });
+        const result = await runToolkit(['--cli', pdf, seasonRoot]);
+        return NextResponse.json({ ok: result.code === 0, output: result.output, code: result.code, season });
+      }
+
+      case 'migrate': {
+        // One-time move: legacy <league>\<Division>\Week N folders into
+        // <league>\<season>\<Division>\Week N.
+        const league = readLeagueFolder();
+        if (!league) return NextResponse.json({ error: 'Set the league folder first.' }, { status: 400 });
+        const season = String(a.season ?? '').trim() || String(new Date().getFullYear());
+        const seasonRoot = path.join(league, season);
+        fs.mkdirSync(seasonRoot, { recursive: true });
+        const moved: string[] = [];
+        let entries: fs.Dirent[];
+        try { entries = fs.readdirSync(league, { withFileTypes: true }); } catch (e) {
+          return NextResponse.json({ error: String(e) }, { status: 500 });
+        }
+        for (const e of entries) {
+          if (!e.isDirectory()) continue;
+          if (NON_SEASON_DIRS.has(e.name.toLowerCase())) continue;
+          const div = path.join(league, e.name);
+          // Only legacy division folders — ones that directly hold Week dirs.
+          let kids: fs.Dirent[];
+          try { kids = fs.readdirSync(div, { withFileTypes: true }); } catch { continue; }
+          if (!kids.some((k) => /^week \d+$/i.test(k.name))) continue;
+          fs.renameSync(div, path.join(seasonRoot, e.name));
+          moved.push(e.name);
+        }
+        return NextResponse.json({ ok: true, moved, season });
       }
 
       case 'nexus_start': {
