@@ -222,6 +222,28 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, moved, season });
       }
 
+      case 'nexus_matches': {
+        const league = readLeagueFolder();
+        if (!league) return NextResponse.json({ error: 'Set the league folder first.' }, { status: 400 });
+        const weekName = String(a.weekFolder ?? '');
+        if (!weekName) return NextResponse.json({ error: 'Pick a week first.' }, { status: 400 });
+        const matches = await new Promise<{ matches?: { index: number; teams: string; matchCount: number }[]; error?: string }>((resolve) => {
+          execFile(PY_EXE, [HELPER, '--list', league, weekName], {
+            timeout: 120_000,
+            windowsHide: true,
+            maxBuffer: 2_000_000,
+            encoding: 'utf8',
+            env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+          }, (err, stdout) => {
+            if (err && !stdout) { resolve({ error: String(err).slice(0, 200) }); return; }
+            try { resolve(JSON.parse(stdout)); }
+            catch { resolve({ error: `unreadable output: ${String(stdout).slice(0, 120)}` }); }
+          });
+        });
+        if (matches.error) return NextResponse.json({ error: matches.error }, { status: 400 });
+        return NextResponse.json({ ok: true, matches: matches.matches ?? [] });
+      }
+
       case 'nexus_start': {
         const league = readLeagueFolder();
         if (!league) return NextResponse.json({ error: 'Set the league folder first.' }, { status: 400 });

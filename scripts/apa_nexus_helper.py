@@ -44,7 +44,28 @@ def write_state(state):
     STATE.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
+def list_matches(league: Path, week_name: str):
+    """--list mode: red-line the week folder and print the team matches as JSON."""
+    folder = league / week_name
+    if not folder.is_dir():
+        print(json.dumps({"error": f"no such week folder: {folder}"}))
+        sys.exit(1)
+    entries = tk.redline_folder(folder, tk.Rules())
+    out = [
+        {"index": i, "teams": " vs ".join(e["teams"]), "matchCount": len(e["matches"])}
+        for i, e in enumerate(entries)
+    ]
+    print(json.dumps({"matches": out}, ensure_ascii=False))
+
+
 def main():
+    if len(sys.argv) >= 2 and sys.argv[1] == "--list":
+        if len(sys.argv) < 4:
+            print(json.dumps({"error": "usage: --list <league> <week folder>"}))
+            sys.exit(1)
+        list_matches(Path(sys.argv[2]).expanduser(), sys.argv[3])
+        return
+
     if len(sys.argv) < 4:
         print(json.dumps({"error": "usage: apa_nexus_helper.py <league> <week folder> <match index>"}))
         sys.exit(1)

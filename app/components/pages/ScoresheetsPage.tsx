@@ -49,6 +49,8 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
   const [weekSel, setWeekSel] = useState('');
   const [matchSel, setMatchSel] = useState(0);
   const [nexus, setNexus] = useState<NexusState | null>(null);
+  const [matches, setMatches] = useState<{ index: number; teams: string; matchCount: number }[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
   const [error, setError] = useState('');
   const helperRunningRef = useRef(false);
 
@@ -120,6 +122,23 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
     if (d.error) { setError(d.error); return; }
     void loadConfig();
   };
+
+  // Red-line the selected week and list its team matches.
+  useEffect(() => {
+    if (!weekSel) { setMatches([]); return; }
+    let cancelled = false;
+    setMatchesLoading(true);
+    fetch('/api/apa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'nexus_matches', weekFolder: weekSel }),
+    }).then((r) => r.json()).then((d: { matches?: { index: number; teams: string; matchCount: number }[]; error?: string }) => {
+      if (cancelled) return;
+      setMatches(d.matches ?? []);
+      if (d.error) setError(d.error);
+      setMatchSel(d.matches?.length ? d.matches[0].index : 0);
+    }).catch(() => { if (!cancelled) setMatches([]); }).finally(() => { if (!cancelled) setMatchesLoading(false); });
+    return () => { cancelled = true; };
+  }, [weekSel]);
 
   const startHelper = async () => {
     setError('');
@@ -240,14 +259,17 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
 
           {weeks.length > 0 && (
             <div className="grid grid-cols-2 gap-2">
-              <select value={weekSel} onChange={(e) => { setWeekSel(e.target.value); setMatchSel(0); }}
+              <select value={weekSel} onChange={(e) => { setWeekSel(e.target.value); setMatchSel(0); setMatches([]); }}
                 className="bg-black/40 border border-amber-500/30 rounded px-2 py-1.5 text-amber-100 text-xs">
                 <option value="">Choose week…</option>
                 {weeks.map((w) => <option key={w.name} value={w.name}>{w.division} — {w.name}</option>)}
               </select>
-              <div className="text-[10px] text-white/30 font-mono self-center">
-                {weekSel ? `matches red-lined in ${weekSel}` : 'pick a week folder'}
-              </div>
+              <select value={matchSel} disabled={!weekSel || matchesLoading}
+                onChange={(e) => setMatchSel(Number(e.target.value))}
+                className="bg-black/40 border border-amber-500/30 rounded px-2 py-1.5 text-amber-100 text-xs">
+                <option value="">{matchesLoading ? 'Red-lining week…' : 'Choose team match…'}</option>
+                {matches.map((m) => <option key={m.index} value={m.index}>{m.teams} ({m.matchCount} players)</option>)}
+              </select>
             </div>
           )}
           {weeks.length === 0 && configured && (
