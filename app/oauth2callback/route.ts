@@ -128,6 +128,24 @@ export async function GET(req: NextRequest) {
   const serviceId: 'calendar' | 'gmail' = scope.includes('auth/calendar') ? 'calendar' : 'gmail';
   try {
     const tokenPath = getGoogleTokenPath(serviceId);
+    // The @cocal calendar package manages its own MULTI-ACCOUNT store here
+    // ("{normal: {...}, personal: {...}}"). Never overwrite it with a flat
+    // single-account token — its auth command writes it itself.
+    if (serviceId === 'calendar' && fs.existsSync(tokenPath)) {
+      try {
+        const existing = JSON.parse(fs.readFileSync(tokenPath, 'utf8')) as Record<string, unknown>;
+        const isPackageStore = Object.values(existing).some(
+          (v) => v && typeof v === 'object' && 'access_token' in (v as Record<string, unknown>)
+        );
+        if (isPackageStore) {
+          return htmlResponse(
+            'Calendar connected',
+            'Google Calendar authorized — the account was registered by the calendar service itself. You can close this tab.',
+            true,
+          );
+        }
+      } catch { /* unreadable — fall through and write */ }
+    }
     fs.mkdirSync(path.dirname(tokenPath), { recursive: true });
     fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
   } catch (err) {
