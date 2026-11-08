@@ -39,6 +39,8 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
   const [pdfPath, setPdfPath] = useState('');
   const [processing, setProcessing] = useState(false);
   const [processLog, setProcessLog] = useState('');
+  const [pdfList, setPdfList] = useState<{ name: string; path: string; mtime: number }[]>([]);
+  const [selectedPdf, setSelectedPdf] = useState('');
   const [weekSel, setWeekSel] = useState('');
   const [matchSel, setMatchSel] = useState(0);
   const [nexus, setNexus] = useState<NexusState | null>(null);
@@ -54,7 +56,10 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
     setLeagueInput(d.league ?? '');
     setWeeks(d.weeks ?? []);
     if (!d.configured && d.message) setError(d.message);
-  }, []);
+    const p = await fetch('/api/apa?op=list_pdfs').then((r) => r.json()) as { pdfs?: { name: string; path: string; mtime: number }[] };
+    setPdfList(p.pdfs ?? []);
+    if (!selectedPdf && (p.pdfs ?? []).length) setSelectedPdf(p.pdfs![0].path);
+  }, [selectedPdf]);
 
   useEffect(() => { void loadConfig(); }, [loadConfig]);
 
@@ -151,15 +156,31 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
 
         {/* process PDF */}
         <div className="rounded-lg p-4 space-y-2" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(34,211,238,0.12)' }}>
-          <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-cyan-400/70">1 · File &amp; red-line the weekly PDF</div>
+          <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-cyan-400/70">1 · Pick &amp; process the weekly scoresheets PDF</div>
+          <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+            {pdfList.length === 0 && <p className="text-xs text-white/35">No PDFs found in Downloads or the league folder.</p>}
+            {pdfList.map((p) => (
+              <button key={p.path}
+                onClick={() => { setSelectedPdf(p.path); setPdfPath(p.path); }}
+                className={`w-full flex items-center gap-3 text-left px-3 py-2 rounded border transition-all ${
+                  selectedPdf === p.path
+                    ? 'bg-cyan-500/15 border-cyan-500/40'
+                    : 'bg-white/[0.03] border-white/[0.06] hover:border-cyan-500/30'
+                }`}>
+                <span className="text-cyan-400/70 text-xs">📄</span>
+                <span className="flex-1 min-w-0 truncate font-mono text-[11px] text-white/75">{p.name}</span>
+                <span className="font-mono text-[9px] text-white/25 shrink-0">{new Date(p.mtime).toLocaleDateString()}</span>
+              </button>
+            ))}
+          </div>
           <div className="flex gap-2">
             <input
               value={pdfPath}
               onChange={(e) => setPdfPath(e.target.value)}
-              placeholder="Path to the combined Digital Scoresheets PDF…"
+              placeholder="…or paste a full path"
               className="flex-1 bg-black/40 border border-cyan-500/30 rounded px-3 py-2 text-cyan-100 font-mono text-xs"
             />
-            <button onClick={() => void process()} disabled={processing || !configured}
+            <button onClick={() => void process()} disabled={processing || !configured || !(selectedPdf || pdfPath).trim()}
               className="px-3 py-2 rounded font-mono text-[10px] uppercase tracking-widest bg-cyan-500/10 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 shrink-0">
               {processing ? 'Working…' : 'Process'}
             </button>

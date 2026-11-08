@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 export const runtime = 'nodejs';
@@ -65,6 +66,30 @@ function runToolkit(args: string[], timeoutMs = 300_000): Promise<{ code: number
   });
 }
 
+/** Candidate PDFs to process: Downloads + league folder root. */
+function listPdfCandidates(league: string): { name: string; path: string; mtime: number }[] {
+  const folders = [
+    path.join(os.homedir(), 'Downloads'),
+    ...(league && fs.existsSync(league) ? [league] : []),
+  ];
+  const seen = new Set<string>();
+  const out: { name: string; path: string; mtime: number }[] = [];
+  for (const dir of folders) {
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (!e.isFile() || !e.name.toLowerCase().endsWith('.pdf')) continue;
+      const full = path.join(dir, e.name);
+      if (seen.has(full.toLowerCase())) continue;
+      seen.add(full.toLowerCase());
+      try {
+        out.push({ name: e.name, path: full, mtime: fs.statSync(full).mtimeMs });
+      } catch { /* skip */ }
+    }
+  }
+  return out.sort((a, b) => b.mtime - a.mtime).slice(0, 25);
+}
+
 function weekFolders(league: string): { name: string; division: string }[] {
   const out: { name: string; division: string }[] = [];
   const walk = (dir: string, depth: number) => {
@@ -104,6 +129,10 @@ export async function GET(req: NextRequest) {
 
   if (op === 'weeks') {
     return NextResponse.json({ configured: true, league, weeks: weekFolders(league) });
+  }
+
+  if (op === 'list_pdfs') {
+    return NextResponse.json({ ok: true, league, pdfs: listPdfCandidates(league) });
   }
 
   return NextResponse.json({ configured: true, league });
