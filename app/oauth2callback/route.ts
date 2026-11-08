@@ -121,15 +121,19 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Save the tokens where the Gmail MCP server and the wizard expect them.
+  // Route the tokens to the service that matches the GRANTED scopes — the
+  // same callback serves both flows, and a calendar consent must never land
+  // in the Gmail store (or the calendar server finds no valid account).
+  const scope = String((tokens as { scope?: string }).scope ?? '');
+  const serviceId: 'calendar' | 'gmail' = scope.includes('auth/calendar') ? 'calendar' : 'gmail';
   try {
-    const tokenPath = getGoogleTokenPath('gmail');
+    const tokenPath = getGoogleTokenPath(serviceId);
     fs.mkdirSync(path.dirname(tokenPath), { recursive: true });
     fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
   } catch (err) {
     return htmlResponse(
       'Could not save tokens',
-      `Gmail authorized, but writing the token file failed: ${
+      `Authorized, but writing the token file failed: ${
         err instanceof Error ? err.message : String(err)
       }`,
       false,
@@ -138,8 +142,8 @@ export async function GET(req: NextRequest) {
   }
 
   return htmlResponse(
-    'Gmail connected',
-    'Gmail is now authorized for Jarvis. You can close this tab and return to the app.',
+    serviceId === 'calendar' ? 'Calendar connected' : 'Gmail connected',
+    `${serviceId === 'calendar' ? 'Google Calendar' : 'Gmail'} is now authorized for Jarvis. You can close this tab and return to the app.`,
     true,
   );
 }
