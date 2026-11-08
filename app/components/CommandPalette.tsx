@@ -42,6 +42,7 @@ const PAGES: { page: string; label: string }[] = [
   { page: 'dev-mode', label: 'Developer' },
   { page: 'market', label: 'Market' },
   { page: 'network-radar', label: 'Network Radar' },
+  { page: 'finance', label: 'Finance' },
 ];
 
 const WIDGETS: { widget: string; label: string }[] = [

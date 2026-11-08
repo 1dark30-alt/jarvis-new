@@ -97,6 +97,9 @@ const PAGE_ITEMS: { page: string; label: string; icon: React.ReactNode }[] = [
   { page: 'network-radar', label: 'Network', icon: (
     <svg {...ICON_PROPS}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /><circle cx="16.5" cy="7.5" r="1.3" fill="currentColor" /><circle cx="7" cy="16" r="1.3" fill="currentColor" /></svg>
   ) },
+  { page: 'finance', label: 'Finance', icon: (
+    <svg {...ICON_PROPS}><path d="M3 8h18v10H3z" /><path d="M3 11h18M7 15h4" /></svg>
+  ) },
 ];
 
 /**

@@ -36,6 +36,10 @@ export interface JarvisSettings extends BreezeSettings {
   geminiProviderUrl?: string;
   geminiProviderKey?: string;
   geminiProviderFirst?: boolean;
+  /** Plaid — bank connections for the Finance screen. */
+  plaidClientId?: string;
+  plaidSecret?: string;
+  plaidEnv?: 'sandbox' | 'development' | 'production';
   realtimeModel?: RealtimeModel;
   localLlmUrl?: string;
   localLlmModel?: string;
@@ -360,6 +364,38 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings, dynami
                   </p>
                 </div>
               )}
+
+              {/* Plaid — bank connections (Finance screen) */}
+              <div className="space-y-2 pt-2 border-t border-cyan-500/10">
+                <label className="text-xs font-bold text-cyan-500 uppercase tracking-widest">Plaid · Banking (Finance screen)</label>
+                <input
+                  type="text"
+                  value={settings.plaidClientId ?? ''}
+                  onChange={(e) => setSettings({ ...settings, plaidClientId: e.target.value })}
+                  placeholder="Plaid client_id (from dashboard.plaid.com)"
+                  className="w-full bg-cyan-950/20 border border-cyan-500/30 rounded px-3 py-2 text-cyan-100 font-mono text-sm"
+                />
+                <input
+                  type="password"
+                  value={settings.plaidSecret ?? ''}
+                  onChange={(e) => setSettings({ ...settings, plaidSecret: e.target.value })}
+                  placeholder="Plaid secret"
+                  className="w-full bg-cyan-950/20 border border-cyan-500/30 rounded px-3 py-2 text-cyan-100 font-mono text-sm"
+                />
+                <select
+                  value={settings.plaidEnv ?? 'sandbox'}
+                  onChange={(e) => setSettings({ ...settings, plaidEnv: e.target.value as 'sandbox' | 'development' | 'production' })}
+                  className="w-full bg-black border border-cyan-500/30 rounded px-3 py-2 text-cyan-100 text-sm"
+                >
+                  <option value="sandbox">Sandbox (fake banks — test the flow)</option>
+                  <option value="development">Development (real banks, limited)</option>
+                  <option value="production">Production (real banks, full access)</option>
+                </select>
+                <p className="text-[10px] text-cyan-700 leading-tight">
+                  Connect each bank on the Finance screen and label it business or personal.
+                  Google Pay purchases show up automatically — they post to the underlying bank card.
+                </p>
+              </div>
 
               {/* Gemini text ladder — server brain (independent of voice mode) */}
               <div className="space-y-2 pt-2 border-t border-cyan-500/10">

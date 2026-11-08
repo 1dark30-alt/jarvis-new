@@ -1239,6 +1239,63 @@ export const FUNCTION_REGISTRY: JarvisFunction[] = [
     },
   },
   {
+    name: 'finance_command',
+    label: 'Finance',
+    description: 'Spending summary, subscriptions and balances from the connected banks',
+    tool: {
+      type: 'function',
+      name: 'finance_command',
+      description:
+        'Bank data for the user\'s connected accounts (one business bank, one personal bank — labelled in the Finance screen). ' +
+        'op "summary": where the spending is going by category, the business/personal split, and total spent over the window. ' +
+        'op "subscriptions": detected recurring charges (Netflix-style subscriptions) with amount, cadence and next estimated date. ' +
+        'op "accounts": connected accounts and balances. ' +
+        'Use when the user asks about spending, subscriptions, bank balances, or their money generally. ' +
+        'This is read-only — never present numbers as financial advice.',
+      parameters: {
+        type: 'object',
+        properties: {
+          op: { type: 'string', enum: ['summary', 'subscriptions', 'accounts'] },
+          days: { type: 'number', description: 'Window in days: 30 (default), 60 or 90.' },
+        },
+        required: ['op'],
+      },
+    },
+    handler: async (args) => {
+      try {
+        const op = String(args.op ?? 'summary');
+        const d = await fetch('/api/plaid', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ op, days: args.days }),
+        }).then((r) => r.json()) as Record<string, unknown> & { error?: string };
+        if (d.error) return { error: String(d.error) };
+        if (op === 'accounts') {
+          window.dispatchEvent(new CustomEvent('jarvis:navigate', { detail: { page: 'finance' } }));
+          return { accounts: (d.accounts as { name: string; mask: string; label: string; balance: number | null }[] ?? []).map((x) => `${x.label}: ${x.name} ••${x.mask} — ${x.balance !== null ? '$' + x.balance.toFixed(2) : 'balance unavailable'}`) };
+        }
+        const subs = (d.subscriptions as { merchant: string; amount: number; cadence: string; nextEstimate: string | null }[] | undefined) ?? [];
+        if (op === 'subscriptions') {
+          return {
+            count: subs.length,
+            monthlyEstimate: `$${subs.reduce((s, x) => s + (x.cadence === 'monthly' ? x.amount : x.cadence === 'biweekly' ? x.amount * 26 / 12 : x.cadence === 'weekly' ? x.amount * 52 / 12 : 0), 0).toFixed(2)} / month (from detected cadences)`,
+            subscriptions: subs.map((x) => `${x.merchant}: $${x.amount} ${x.cadence}${x.nextEstimate ? `, next ~${x.nextEstimate}` : ''}`),
+          };
+        }
+        const split = d.split as { business: number; personal: number } | undefined;
+        window.dispatchEvent(new CustomEvent('jarvis:navigate', { detail: { page: 'finance' } }));
+        return {
+          totalSpent: `$${(d.totalSpent as number ?? 0).toFixed(2)} over ${d.days} days`,
+          business: `$${(split?.business ?? 0).toFixed(2)}`,
+          personal: `$${(split?.personal ?? 0).toFixed(2)}`,
+          topCategories: (d.spendingByCategory as { category: string; total: number }[] | undefined)?.slice(0, 6).map((c) => `${c.category}: $${c.total.toFixed(2)}`),
+        };
+      } catch (err) {
+        return { error: String(err) };
+      }
+    },
+  },
+  {
     name: 'memory_command',
     label: 'Memory',
     description: 'Remember, recall and forget facts about the user across sessions',
@@ -1940,7 +1997,7 @@ export const FUNCTION_REGISTRY: JarvisFunction[] = [
       type: 'function',
       name: 'navigate_to_page',
       description:
-        'Navigate Jarvis to a different page. Use for "home", "news", "calendar", "home-assistant", "3d-printers", "music", "spiderman", "manufacturing", "webshooter", "social", "audio-test", "round-display", "bounty-hunter", "wildcard-draw", "gods-eye", "disk-map", "build-guide", "missions", "memory", "health", or "dev-mode". ' +
+        'Navigate Jarvis to a different page. Use for "home", "news", "calendar", "home-assistant", "3d-printers", "music", "spiderman", "manufacturing", "webshooter", "social", "audio-test", "round-display", "bounty-hunter", "wildcard-draw", "gods-eye", "disk-map", "build-guide", "missions", "memory", "health", "dev-mode", or "finance". ' +
         '"news" opens the live news feed with streaming video and market data. ' +
         '"calendar" opens the calendar and task planner. ' +
         '"home-assistant" opens the smart home control panel for lights, switches, climate, and more. ' +
@@ -1960,6 +2017,7 @@ export const FUNCTION_REGISTRY: JarvisFunction[] = [
         '"memory" opens the Memory panel — every stored fact with when it was learned and one-click delete. Use when the user asks what Jarvis remembers or wants to manage stored facts. ' +
         '"health" opens the Health page — live machine gauges and service checks. ' +
         '"dev-mode" opens the Developer page — engineering jobs with outputs. ' +
+        '"finance" opens the Finance screen — bank spending, subscriptions and balances (read-only). Use when the user asks about their money. ' +
         '"home" returns to the main Jarvis home screen. ' +
         'NEVER use this for map or location requests — use map_command instead.',
       parameters: {
@@ -1967,8 +2025,8 @@ export const FUNCTION_REGISTRY: JarvisFunction[] = [
         properties: {
           page: {
             type: 'string',
-            enum: ['home', 'news', 'calendar', 'home-assistant', '3d-printers', 'music', 'spiderman', 'manufacturing', 'webshooter', 'social', 'audio-test', 'round-display', 'bounty-hunter', 'wildcard-draw', 'gods-eye', 'disk-map', 'build-guide', 'missions', 'memory', 'health', 'dev-mode'],
-            description: '"home" = main Jarvis view. "news" = live news + stocks feed. "calendar" = calendar and daily task planner. "home-assistant" = smart home control panel. "3d-printers" = Bambu Lab 3D printer dashboard. "music" = full-screen music player. "spiderman" = Spider-Man suit armory with a 3D holographic suit carousel. "manufacturing" = fabrication bay for building 3D components on printers/lasers/CNC. "webshooter" = web-shooter designer lab for building taser web / web fluid / web grenade / acid web cartridges. "social" = Social Command dashboard with Instagram/TikTok/Facebook/YouTube browsers and AI comment replies. "audio-test" = Audio Lab for typing speech scripts, previewing, and saving MP3s via OpenAI or ElevenLabs. "round-display" = full-screen circular visualizer for round displays. "bounty-hunter" = local league dashboard for rosters, bounties, standings and posters. "wildcard-draw" = offline wildcard team draw board. "gods-eye" = satellite intelligence console with live aircraft, ships, satellites and earthquakes. "disk-map" = live treemap of disk usage. "build-guide" = wiring-diagram page (open it with the build_guide tool). "missions" = board of background missions and their reports. "memory" = panel of everything Jarvis remembers about the user. "health" = live system health gauges. "dev-mode" = engineering job runner.',
+            enum: ['home', 'news', 'calendar', 'home-assistant', '3d-printers', 'music', 'spiderman', 'manufacturing', 'webshooter', 'social', 'audio-test', 'round-display', 'bounty-hunter', 'wildcard-draw', 'gods-eye', 'disk-map', 'build-guide', 'missions', 'memory', 'health', 'dev-mode', 'finance'],
+            description: '"home" = main Jarvis view. "news" = live news + stocks feed. "calendar" = calendar and daily task planner. "home-assistant" = smart home control panel. "3d-printers" = Bambu Lab 3D printer dashboard. "music" = full-screen music player. "spiderman" = Spider-Man suit armory with a 3D holographic suit carousel. "manufacturing" = fabrication bay for building 3D components on printers/lasers/CNC. "webshooter" = web-shooter designer lab for building taser web / web fluid / web grenade / acid web cartridges. "social" = Social Command dashboard with Instagram/TikTok/Facebook/YouTube browsers and AI comment replies. "audio-test" = Audio Lab for typing speech scripts, previewing, and saving MP3s via OpenAI or ElevenLabs. "round-display" = full-screen circular visualizer for round displays. "bounty-hunter" = local league dashboard for rosters, bounties, standings and posters. "wildcard-draw" = offline wildcard team draw board. "gods-eye" = satellite intelligence console with live aircraft, ships, satellites and earthquakes. "disk-map" = live treemap of disk usage. "build-guide" = wiring-diagram page (open it with the build_guide tool). "missions" = board of background missions and their reports. "memory" = panel of everything Jarvis remembers about the user. "health" = live system health gauges. "dev-mode" = engineering job runner. "finance" = bank spending/subscriptions screen.',
           },
         },
         required: ['page'],

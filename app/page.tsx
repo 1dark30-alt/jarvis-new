@@ -132,9 +132,15 @@ const NetworkRadarPage = dynamic(
   { ssr: false }
 );
 
-type JarvisPage = 'home' | 'news' | 'map' | 'calendar' | 'home-assistant' | '3d-printers' | 'music' | 'round-display' | 'spiderman' | 'manufacturing' | 'webshooter' | 'social' | 'audio-test' | 'bounty-hunter' | 'wildcard-draw' | 'gods-eye' | 'disk-map' | 'build-guide' | 'missions' | 'memory' | 'health' | 'dev-mode' | 'market' | 'network-radar';
+// Finance — bank data via Plaid: spending, subscriptions, business/personal
+const FinancePage = dynamic(
+  () => import('./components/pages/FinancePage').then((m) => ({ default: m.FinancePage })),
+  { ssr: false }
+);
 
-const VALID_PAGES: JarvisPage[] = ['home', 'news', 'map', 'calendar', 'home-assistant', '3d-printers', 'music', 'round-display', 'spiderman', 'manufacturing', 'webshooter', 'social', 'audio-test', 'bounty-hunter', 'wildcard-draw', 'gods-eye', 'disk-map', 'build-guide', 'missions', 'memory', 'health', 'dev-mode', 'market', 'network-radar'];
+type JarvisPage = 'home' | 'news' | 'map' | 'calendar' | 'home-assistant' | '3d-printers' | 'music' | 'round-display' | 'spiderman' | 'manufacturing' | 'webshooter' | 'social' | 'audio-test' | 'bounty-hunter' | 'wildcard-draw' | 'gods-eye' | 'disk-map' | 'build-guide' | 'missions' | 'memory' | 'health' | 'dev-mode' | 'market' | 'network-radar' | 'finance';
+
+const VALID_PAGES: JarvisPage[] = ['home', 'news', 'map', 'calendar', 'home-assistant', '3d-printers', 'music', 'round-display', 'spiderman', 'manufacturing', 'webshooter', 'social', 'audio-test', 'bounty-hunter', 'wildcard-draw', 'gods-eye', 'disk-map', 'build-guide', 'missions', 'memory', 'health', 'dev-mode', 'market', 'network-radar', 'finance'];
 
 interface BuildModel { file: string; name: string; sub: string }
 
@@ -319,6 +325,9 @@ export default function Home() {
         )}
         {currentPage === 'network-radar' && (
           <NetworkRadarPage key="network-radar" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'finance' && (
+          <FinancePage key="finance" onNavigateHome={() => setCurrentPage('home')} />
         )}
       </AnimatePresence>
 
