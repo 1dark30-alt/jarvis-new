@@ -55,9 +55,28 @@ function emptyFacts(): Facts {
   return f as Facts;
 }
 
-function storeFile(): string {
+function dataDir(): string {
+  // If an Obsidian vault is configured, the memory file lives INSIDE the
+  // vault — LiveSync then shares the same memory (and conversation notes)
+  // across every machine that runs Jarvis.
+  try {
+    const raw = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) as Record<string, unknown>;
+    const inner = (typeof raw.jarvis_settings === 'string'
+      ? JSON.parse(raw.jarvis_settings)
+      : raw.jarvis_settings ?? {}) as Record<string, unknown>;
+    const vault = String(inner.obsidian_vault_path ?? '').trim();
+    if (vault && fs.existsSync(vault)) return path.join(vault, 'Jarvis Memory');
+  } catch { /* fall back */ }
+  return process.env.JARVIS_DATA_DIR || process.cwd();
+}
+
+function settingsFile(): string {
   const base = process.env.JARVIS_DATA_DIR || process.cwd();
-  return path.join(base, 'jarvis-memory.json');
+  return path.join(base, 'jarvis-server-settings.json');
+}
+
+function storeFile(): string {
+  return path.join(dataDir(), 'jarvis-memory.json');
 }
 
 let store: Store | null = null;

@@ -132,6 +132,20 @@ export function RadialNav({ currentPage }: { currentPage: string }) {
     setOpen(false);
   };
 
+  // Ring layout: work tools on the inner ring, personal + system on the
+  // outer ring. The display order follows these two lists.
+  const RING_INNER = [
+    'home', 'calendar', 'bounty-hunter', 'scoresheets', 'finance', 'market',
+    'missions', 'home-assistant', '3d-printers', 'manufacturing',
+    'network-radar', 'health', 'disk-map',
+  ];
+  const RING_OUTER = [
+    'news', 'map', 'music', 'social', 'audio-test', 'round-display',
+    'spiderman', 'webshooter', 'wildcard-draw', 'gods-eye', 'memory',
+    'developer', 'lock', 'ambient', 'settings',
+  ];
+  const RING_ORDER = [...RING_INNER, ...RING_OUTER];
+
   const actions: RadialNavItem[] = [
     ...PAGE_ITEMS.map((it) => ({
       id: it.page,
@@ -174,12 +188,15 @@ export function RadialNav({ currentPage }: { currentPage: string }) {
     },
   ];
 
-  // Two rings: the first half of the actions sit on the inner circle, the
-  // rest on the outer one — a single ring can't hold 20 items without the
-  // labels colliding.
-  const RADIUS_INNER = 150;
-  const RADIUS_OUTER = 260;
-  const firstRingCount = Math.ceil(actions.length / 2);
+  // Two rings: work tools on the inner circle, personal + system on the
+  // outer one — a single ring can't hold this many items without labels
+  // colliding.
+  const orderedActions = RING_ORDER.map((id) => actions.find((a) => a.id === id)).filter(
+    (a): a is RadialNavItem => Boolean(a),
+  );
+  const RADIUS_INNER = 168;
+  const RADIUS_OUTER = 280;
+  const firstRingCount = RING_INNER.length;
   const ringFor = (i: number) => (i < firstRingCount ? 0 : 1);
   const ringRadius = (ring: number) => (ring === 0 ? RADIUS_INNER : RADIUS_OUTER);
   const ringSize = RADIUS_OUTER * 2 + 170;
@@ -259,7 +276,7 @@ export function RadialNav({ currentPage }: { currentPage: string }) {
               </motion.div>
 
               {/* Items on the two rings */}
-              {actions.map((item, i) => {
+              {orderedActions.map((item, i) => {
                 const ring = ringFor(i);
                 const inRing = ring === 0 ? i : i - firstRingCount;
                 const ringCount = ring === 0 ? firstRingCount : actions.length - firstRingCount;

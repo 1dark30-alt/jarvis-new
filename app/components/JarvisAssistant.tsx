@@ -30,9 +30,38 @@ const LOCKED_RESULT = {
   error: 'The interface is locked. Tell the user the interface is in lockdown and the PIN must be entered on screen to unlock it.',
 };
 
+// Session transcript buffer — flushed into the Obsidian vault as a dated
+// note when the voice session ends, so conversations are readable on every
+// machine that shares the vault.
+const sessionTranscript: { role: 'user' | 'jarvis'; text: string }[] = [];
+let transcriptFlushBusy = false;
+
 function dispatchTranscript(role: 'user' | 'jarvis', text: string): void {
   if (!text?.trim()) return;
+  sessionTranscript.push({ role, text: text.trim() });
   window.dispatchEvent(new CustomEvent('jarvis:transcript', { detail: { role, text } }));
+}
+
+async function flushTranscriptToVault(): Promise<void> {
+  if (transcriptFlushBusy || sessionTranscript.length === 0) return;
+  transcriptFlushBusy = true;
+  try {
+    const now = new Date();
+    const dateKey = now.toISOString().slice(0, 10);
+    const timeKey = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const block = [
+      `## Session — ${timeKey}`, '',
+      ...sessionTranscript.map((l) => `- **${l.role === 'user' ? 'User' : 'Jarvis'}:** ${l.text.slice(0, 400)}`),
+      '',
+    ].join('\n');
+    sessionTranscript.length = 0;
+    await fetch('/api/obsidian', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'append', file: `Conversations/${dateKey}.md`, text: block }),
+    });
+  } catch { /* vault not configured or offline — transcripts stay session-only */ }
+  finally { transcriptFlushBusy = false; }
 }
 
 const FFT_BARS = 64;
@@ -636,11 +665,13 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
     return () => window.removeEventListener('jarvis:memory-updated', load);
   }, []);
 
-  // Broadcast voice state for proactive services (routine engine etc.)
+  // Broadcast voice state for proactive services (routine engine etc.), and
+  // flush the conversation transcript into the vault when a session ends.
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('jarvis:voice-state', {
       detail: { connected: status === 'active' || status === 'listening' },
     }));
+    if (status === 'idle' || status === 'error') void flushTranscriptToVault();
   }, [status]);
 
   // Load settings — server first (shared across all LAN clients), then localStorage fallback
