@@ -119,7 +119,7 @@ function detectSubscriptions(txns: Txn[]) {
   return subs;
 }
 
-function enrich(txns: Txn[]): (Txn & { _label: string })[] {
+function enrich(txns: (Txn & { _institution: string })[]): (Txn & { _label: string; _institution: string })[] {
   const items = listItems();
   const labelByAccount = new Map<string, string>();
   // /transactions/get returns accounts per item; map account_id → item label
