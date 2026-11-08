@@ -142,15 +142,26 @@ export async function POST(req: NextRequest) {
 
     switch (op) {
       case 'link_token': {
-        const data = await plaidCall<{ link_token: string; expiration?: string }>('/link/token/create', creds, {
+        const base = {
           user: { client_user_id: `jarvis-${Date.now()}` },
           client_name: 'Jarvis',
           products: ['transactions'],
           country_codes: ['US'],
           language: 'en',
-          redirect_uri: 'http://127.0.0.1:3000/finance',
-        });
-        return NextResponse.json({ ok: true, linkToken: data.link_token });
+        };
+        // redirect_uri is required for OAuth-based banks (most majors) and must
+        // be whitelisted in the Plaid dashboard. If it isn't whitelisted yet,
+        // fall back to a Link session without it — non-OAuth banks still work.
+        try {
+          const data = await plaidCall<{ link_token: string }>('/link/token/create', creds, {
+            ...base, redirect_uri: 'http://127.0.0.1:3000/finance',
+          });
+          return NextResponse.json({ ok: true, linkToken: data.link_token });
+        } catch (e) {
+          if (!String(e).includes('redirect URI')) throw e;
+          const data = await plaidCall<{ link_token: string }>('/link/token/create', creds, base);
+          return NextResponse.json({ ok: true, linkToken: data.link_token, warn: 'connected without OAuth banks — add http://127.0.0.1:3000/finance to the Plaid dashboard redirect URIs to enable them' });
+        }
       }
 
       case 'exchange': {

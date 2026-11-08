@@ -90,12 +90,12 @@ export async function plaidCall<T = Record<string, unknown>>(
     body: JSON.stringify({ client_id: creds.clientId, secret: creds.secret, ...body }),
     signal: AbortSignal.timeout(60_000),
   });
-  const data = (await res.json()) as Record<string, unknown> & {
-    error?: { error_message?: string; error_code?: string; display_message?: string };
-  };
+  const text = await res.text();
+  let data: Record<string, unknown> = {};
+  try { data = JSON.parse(text) as Record<string, unknown>; } catch { /* non-JSON — surface raw */ }
   if (!res.ok || data.error) {
-    const e = data.error ?? {};
-    const msg = e.display_message ?? e.error_message ?? `Plaid HTTP ${res.status}`;
+    const e = (data.error ?? {}) as { error_message?: string; error_code?: string; display_message?: string };
+    const msg = e.display_message ?? e.error_message ?? `Plaid HTTP ${res.status} — ${text.slice(0, 240)}`;
     throw new Error(`${e.error_code ?? 'PLAID_ERROR'}: ${msg}`);
   }
   return data as T;
