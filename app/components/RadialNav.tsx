@@ -174,8 +174,15 @@ export function RadialNav({ currentPage }: { currentPage: string }) {
     },
   ];
 
-  const RADIUS = 190;
-  const count = actions.length;
+  // Two rings: the first half of the actions sit on the inner circle, the
+  // rest on the outer one — a single ring can't hold 20 items without the
+  // labels colliding.
+  const RADIUS_INNER = 150;
+  const RADIUS_OUTER = 260;
+  const firstRingCount = Math.ceil(actions.length / 2);
+  const ringFor = (i: number) => (i < firstRingCount ? 0 : 1);
+  const ringRadius = (ring: number) => (ring === 0 ? RADIUS_INNER : RADIUS_OUTER);
+  const ringSize = RADIUS_OUTER * 2 + 170;
 
   return (
     <>
@@ -217,7 +224,7 @@ export function RadialNav({ currentPage }: { currentPage: string }) {
             style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
             onClick={() => setOpen(false)}
           >
-            <div className="relative" style={{ width: RADIUS * 2 + 140, height: RADIUS * 2 + 140 }} onClick={(e) => e.stopPropagation()}>
+            <div className="relative" style={{ width: ringSize, height: ringSize }} onClick={(e) => e.stopPropagation()}>
               {/* Spinning segmented reactor ring */}
               <motion.svg
                 className="absolute inset-0 pointer-events-none"
@@ -251,11 +258,15 @@ export function RadialNav({ currentPage }: { currentPage: string }) {
                 </span>
               </motion.div>
 
-              {/* Items around the ring */}
+              {/* Items on the two rings */}
               {actions.map((item, i) => {
-                const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
-                const x = Math.cos(angle) * RADIUS;
-                const y = Math.sin(angle) * RADIUS;
+                const ring = ringFor(i);
+                const inRing = ring === 0 ? i : i - firstRingCount;
+                const ringCount = ring === 0 ? firstRingCount : actions.length - firstRingCount;
+                const angle = (inRing / ringCount) * Math.PI * 2 - Math.PI / 2;
+                const radius = ringRadius(ring);
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
                 const active = item.id === currentPage;
                 return (
                   <motion.button
@@ -263,10 +274,10 @@ export function RadialNav({ currentPage }: { currentPage: string }) {
                     initial={{ opacity: 0, x: 0, y: 0 }}
                     animate={{ opacity: 1, x, y }}
                     exit={{ opacity: 0, x: 0, y: 0 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 26, delay: i * 0.022 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 26, delay: i * 0.018 }}
                     onClick={item.action}
                     className="absolute left-1/2 top-1/2 -ml-8 -mt-8 flex flex-col items-center gap-1.5 group"
-                    style={{ width: 64 }}
+                    style={{ width: 72 }}
                   >
                     <span
                       className="flex items-center justify-center w-14 h-14 rounded-full transition-all group-hover:scale-110"
