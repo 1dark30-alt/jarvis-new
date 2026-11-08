@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bounty Hunters Guild Terminal</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Share+Tech+Mono&family=Rye&display=swap" rel="stylesheet">
+    <!-- App Styles -->
+    <link rel="stylesheet" href="style.css">
+    <!-- html2canvas library for exporting graphics -->
+    <script src="vendor/html2canvas.min.js"></script>
+</head>
+<body>
+    <div class="glow-bg"></div>
+    <div class="crt-overlay"></div>
+    
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <header class="app-header">
+            <div class="logo branding-logo-container">
+                <img src="" class="app-branding-logo" alt="APA Pool Leagues">
+            </div>
+            <nav class="nav-tabs">
+                <button class="nav-tab active" data-tab="tab-bounties">
+                    <span class="tab-icon">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <circle cx="12" cy="11" r="3"/>
+                        </svg>
+                    </span>
+                    <span class="tab-text">Active Contracts</span>
+                </button>
+                <button class="nav-tab" data-tab="tab-leaderboard">
+                    <span class="tab-icon">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34M12 2a4 4 0 0 0-4 4v5c0 2.2 1.8 4 4 4s4-1.8 4-4V6a4 4 0 0 0-4-4z"/>
+                        </svg>
+                    </span>
+                    <span class="tab-text">Guild Standings</span>
+                </button>
+                <button class="nav-tab" data-tab="tab-wanted">
+                    <span class="tab-icon">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="12" cy="10" r="3"/>
+                            <path d="M7 21v-2a4 4 0 0 1 8 0v2"/>
+                        </svg>
+                    </span>
+                    <span class="tab-text">Wanted Posters</span>
+                </button>
+                <button class="nav-tab" data-tab="tab-outcome">
+                    <span class="tab-icon">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                    </span>
+                    <span class="tab-text">Outcome</span>
+                </button>
+                <button class="nav-tab" data-tab="tab-rosters">
+                    <span class="tab-icon">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                    </span>
+                    <span class="tab-text">Sector Registry</span>
+                </button>
+                <button class="nav-tab" data-tab="tab-settings">
+                    <span class="tab-icon">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                    </span>
+                    <span class="tab-text">Terminal Settings</span>
+                </button>
+            </nav>
+            <div class="audio-control-panel">
+                <span class="audio-label">COMMS FEED</span>
+                <button id="comms-audio-btn" class="audio-toggle-btn active" title="Toggle audio feedback">
+                    <svg class="speaker-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path class="wave wave-1" d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                        <path class="wave wave-2" d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                    <span class="status-indicator">ONLINE</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Work Area -->
+        <main class="app-main">
+            
+            <!-- SECTION: BOUNTIES -->
+            <section id="tab-bounties" class="tab-content active">
+                <div class="embedded-branding-header">
+                    <img src="" class="embedded-brand-logo" alt="APA Logo">
+                </div>
+                <div class="section-header">
+                    <div>
+                        <h2>Sector Contracts Hits</h2>
+                        <p>Track active targets, bounty credits, and capture logs by division.</p>
+                    </div>
+                    <div class="week-controls">
+                        <label for="week-select">Cycle:</label>
+                        <div class="custom-select-wrapper">
+                            <select id="week-select">
+                                <!-- Dynamically populated -->
+                            </select>
+                        </div>
+                        <button id="add-week-btn" class="btn btn-secondary">+ New Cycle</button>
+                        <button id="publish-web-btn" class="btn btn-accent publish-btn">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.2rem; display: inline-block; vertical-align: middle;"><path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.6-3.1-3.1-5.4-6.2-5.7m-9.6 4.3C5.5 8.5 7.2 7.6 9 7.6m-6.4 5c.7 2.2 2.5 3.9 4.8 4.4"/></svg>
+                            Save locally
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Video Showcase Card (Public Mode only) -->
+                <div id="public-video-showcase" class="card video-showcase-card hidden" style="margin-bottom: 2rem;">
+                    <h3>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent-cyan)" stroke-width="2" style="vertical-align: middle; margin-right: 0.5rem;">
+                            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                        </svg>
+                        Sector Target Acquisition Scan
+                    </h3>
+                    <p style="margin-bottom: 1rem; font-size: 0.85rem; color: var(--text-secondary);">Watch the tracking fob scanning sequence locate active targets across the sectors.</p>
+                    <div class="video-container">
+                        <!-- Standard HTML5 Video showcasing selection process. Users can replace assets/selection_process.mp4, or use a YouTube embed. -->
+                        <video id="scan-process-video" controls loop autoplay muted playsinline class="showcase-video">
+                            <source src="assets/selection_process.mp4" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                        <!-- To use a YouTube Video instead, comment the <video> above and uncomment this iframe:
+                        <iframe width="560" height="315" src="https://www.youtube.com/embed/YOUR_VIDEO_ID?autoplay=1&mute=1&loop=1&playlist=YOUR_VIDEO_ID" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                        -->
+                    </div>
+                </div>
+
+                <!-- Roll State: No Bounties Rolled Yet -->
+                <div id="no-bounties-state" class="empty-state card hidden">
+                    <div class="empty-icon">
+                        <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="var(--accent-cyan)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-state-svg">
+                            <circle cx="12" cy="12" r="10" stroke-dasharray="3 3"></circle>
+                            <circle cx="12" cy="12" r="6"></circle>
+                            <circle cx="12" cy="12" r="2" fill="var(--accent-cyan)"></circle>
+                            <path d="M12 2v20M2 12h20"></path>
+                        </svg>
+                    </div>
+                    <h3>No Guild Hits Activated For This Cycle</h3>
+                    <p>Initialize tracking fob database scan to select random targets for each division.</p>
+                    <button id="roll-bounties-trigger" class="btn btn-primary btn-large">
+                        <span class="pulse-ring"></span>
+                        Scan Sector for Targets
+                    </button>
+                </div>
+
+                <!-- Active State: Bounty Cards Grid -->
+                <div id="active-bounties-state" class="hidden">
+                    <div class="actions-bar">
+                        <button id="export-card-btn" class="btn btn-accent">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.3rem;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Compile Guild Report
+                        </button>
+                        <button id="reroll-week-btn" class="btn btn-danger-outline">Re-Scan All Contracts</button>
+                    </div>
+                    
+                    <div class="bounty-grid" id="bounty-cards-container">
+                        <!-- Dynamically populated card structure -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: LEADERBOARD -->
+            <section id="tab-leaderboard" class="tab-content">
+                <div class="embedded-branding-header">
+                    <img src="" class="embedded-brand-logo" alt="APA Logo">
+                </div>
+                <div class="section-header">
+                    <div>
+                        <h2>Guild Ranks & Ledger</h2>
+                        <p>Total credits earned by Hunters and credit values survived by Target players.</p>
+                    </div>
+                    <div class="leaderboard-tabs">
+                        <button class="sub-tab active" data-subtab="hunter-board">Hunter Standings</button>
+                        <button class="sub-tab" data-subtab="target-board">Survival Standings</button>
+                    </div>
+                </div>
+
+                <!-- Hunters Board -->
+                <div id="hunter-board" class="sub-tab-content active">
+                    <!-- Dynamic division tables will be populated here -->
+                </div>
+
+                <!-- Targets Board -->
+                <div id="target-board" class="sub-tab-content">
+                    <!-- Dynamic division tables will be populated here -->
+            </section>
+
+            <!-- SECTION: WANTED POSTERS -->
+            <section id="tab-wanted" class="tab-content">
+                <div class="embedded-branding-header">
+                    <img src="" class="embedded-brand-logo" alt="APA Logo">
+                </div>
+                <div class="section-header">
+                    <div>
+                        <h2>Sector Death Marks</h2>
+                        <p>Active cycle bounty alert posters issued by the Guild Central Dispatch.</p>
+                    </div>
+                </div>
+
+                <div class="wanted-page-layout" style="margin-top: 1rem;">
+                    <div id="wanted-empty-state" class="empty-state card">
+                        <div class="empty-icon">
+                            <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="10" stroke-dasharray="3 3"></circle>
+                                <circle cx="12" cy="12" r="6"></circle>
+                                <circle cx="12" cy="12" r="2" fill="var(--text-muted)"></circle>
+                                <path d="M12 2v20M2 12h20"></path>
+                            </svg>
+                        </div>
+                        <h3>No Active Wanted Posters</h3>
+                        <p>No active wanted posters to display for this cycle. Make sure targets are scanned.</p>
+                    </div>
+                    <div id="wanted-active-view" class="hidden">
+                        <div class="wanted-posters-display-grid" id="wanted-display-grid" style="display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2.5rem; width: 100%;">
+                            <!-- Dynamic grid of wanted posters -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: OUTCOME -->
+            <section id="tab-outcome" class="tab-content">
+                <div class="embedded-branding-header">
+                    <img src="" class="embedded-brand-logo" alt="APA Logo">
+                </div>
+                <div class="section-header">
+                    <div>
+                        <h2>Target Outcomes</h2>
+                        <p>Resolve active bounty contracts and download Capture/Evaded posters to share.</p>
+                    </div>
+                </div>
+
+                <div class="outcome-page-layout" style="margin-top: 1rem;">
+                    <div id="outcome-empty-state" class="empty-state card">
+                        <div class="empty-icon">
+                            <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="10" stroke-dasharray="3 3"></circle>
+                                <circle cx="12" cy="12" r="6"></circle>
+                                <circle cx="12" cy="12" r="2" fill="var(--text-muted)"></circle>
+                                <path d="M12 2v20M2 12h20"></path>
+                            </svg>
+                        </div>
+                        <h3>No Active Bounty Contracts</h3>
+                        <p>Generate contracts in Active Contracts first to resolve outcomes.</p>
+                    </div>
+                    <div id="outcome-active-view" class="hidden">
+                        <div class="outcome-list-grid" id="outcome-list-grid" style="display: flex; flex-direction: column; gap: 2rem; width: 100%;">
+                            <!-- Dynamically populated list of targets with resolve options and posters side by side -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: ROSTERS -->
+            <section id="tab-rosters" class="tab-content">
+                <div class="embedded-branding-header">
+                    <img src="" class="embedded-brand-logo" alt="APA Logo">
+                </div>
+                <div class="section-header">
+                    <div>
+                        <h2>Sector Registry</h2>
+                        <p>Configure rosters to draw bounties from. At least one player per division is required to roll.</p>
+                    </div>
+                </div>
+
+                <div class="card settings-card" style="margin-bottom: 1.5rem;">
+                    <h3>Next Session Roster</h3>
+                    <p>Recommended PDF report: <strong>Division Roster Worksheet</strong>. Upload the text-based report to extract each player's division, team and name.</p>
+                    <p>Upload a PDF roster, a CSV with Division, Name, ID and Team columns (ID and Team are optional), or a JSON database/roster. Preview your list before starting a fresh session. Current rosters and results are archived in your database backup.</p>
+                    <div class="form-group">
+                        <label for="next-session-file">New player list (PDF up to 10 MB; CSV/JSON up to 2 MB)</label>
+                        <input type="file" id="next-session-file" accept=".pdf,.csv,.json">
+                    </div>
+                    <div id="pdf-roster-review" class="hidden">
+                        <p>Review every player below. PDF layouts vary: check division, name, ID and team before continuing. Text PDFs are supported; scanned images need OCR first. The PDF reader requires an internet connection.</p>
+                        <details>
+                            <summary>View extracted PDF text</summary>
+                            <pre id="pdf-roster-text" style="white-space: pre-wrap; max-height: 16rem; overflow: auto;"></pre>
+                        </details>
+                        <div class="form-group">
+                            <label for="pdf-roster-csv">Roster to import (editable CSV)</label>
+                            <textarea id="pdf-roster-csv" rows="10" spellcheck="false" style="width: 100%; font-family: monospace;" placeholder="Division,Name,ID,Team"></textarea>
+                        </div>
+                        <button id="validate-pdf-roster" class="btn btn-secondary">Preview Reviewed Roster</button>
+                    </div>
+                    <p id="next-session-preview" role="status" aria-live="polite">No new list selected.</p>
+                    <div id="roster-review-table" class="hidden" style="max-height: 24rem; overflow: auto; margin-bottom: 1rem;">
+                        <table style="width: 100%; text-align: left;">
+                            <caption>Players in the new session</caption>
+                            <thead><tr><th>Division</th><th>Team</th><th>Player</th><th>Member ID</th></tr></thead>
+                            <tbody id="roster-review-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="settings-actions">
+                        <button id="start-next-session" class="btn btn-primary" disabled>Start Next Session</button>
+                        <button id="cancel-next-session" class="btn btn-secondary" disabled>Cancel Upload</button>
+                    </div>
+                </div>
+
+                <div class="rosters-layout">
+                    <!-- Left Panel: Divisions list -->
+                    <div class="divisions-sidebar card">
+                        <div class="sidebar-header">
+                            <h3>Divisions</h3>
+                            <button id="add-div-btn" class="btn-icon" title="Add Division">+</button>
+                        </div>
+                        <div class="add-div-input-group hidden" id="add-div-form">
+                            <input type="text" id="new-div-name" placeholder="e.g., Outer Rim">
+                            <div class="form-actions">
+                                <button id="save-div-btn" class="btn btn-primary btn-sm">Save</button>
+                                <button id="cancel-div-btn" class="btn btn-secondary btn-sm">Cancel</button>
+                            </div>
+                        </div>
+                        <ul class="divisions-list" id="divisions-ul">
+                            <!-- Dynamic divisions list -->
+                        </ul>
+                    </div>
+
+                    <!-- Right Panel: Players list in selected division -->
+                    <div class="players-panel card">
+                        <div id="no-div-selected" class="empty-state">
+                            <div class="empty-icon">
+                                <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                            </div>
+                            <p>Select or create a division to manage targets.</p>
+                        </div>
+                        <div id="div-players-view" class="hidden">
+                            <div class="div-panel-header">
+                                <div class="title-edit-group">
+                                    <h3 id="current-division-title">Division Name</h3>
+                                    <button id="delete-div-btn" class="btn btn-danger-outline btn-sm">Delete Division</button>
+                                </div>
+                                <div class="player-input-row">
+                                    <input type="text" id="new-player-name" placeholder="Player Name" style="flex: 2;">
+                                    <input type="text" id="new-player-id" placeholder="Player ID (e.g. 97000137)" style="flex: 1.5;">
+                                    <input type="text" id="new-player-team" placeholder="Team Name (e.g. Friends)" style="flex: 2;">
+                                    <button id="add-player-btn" class="btn btn-primary">Add Player</button>
+                                </div>
+                            </div>
+                            <div class="players-list-container">
+                                <h4>Targets Count: <span id="player-count">0</span></h4>
+                                <div class="table-container" style="margin-top: 1rem;">
+                                    <table class="leaderboard-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Player ID</th>
+                                                <th>Name</th>
+                                                <th>Team</th>
+                                                <th width="80px" style="text-align: right;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="players-tbody">
+                                            <!-- Dynamic players list -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: SETTINGS -->
+            <section id="tab-settings" class="tab-content">
+                <div class="embedded-branding-header">
+                    <img src="" class="embedded-brand-logo" alt="APA Logo">
+                </div>
+                <div class="section-header">
+                    <div>
+                        <h2>Terminal Settings</h2>
+                        <p>Import/Export database backups, load preset databases, or clear terminal memory.</p>
+                    </div>
+                </div>
+
+                <div class="settings-grid">
+                    <!-- Backup & Restore -->
+                    <div class="card settings-card">
+                        <h3>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 0.5rem;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                            Database Backup & Restore
+                        </h3>
+                        <p>Save your leagues, history, and leaderboards to a file on your computer, or restore a previous save.</p>
+                        <div class="settings-actions">
+                            <button id="export-db-btn" class="btn btn-secondary">Export Data (JSON)</button>
+                            <label for="import-db-input" class="btn btn-primary cursor-pointer">
+                                Import Data (JSON)
+                                <input type="file" id="import-db-input" accept=".json" style="display: none;">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Google Sites Direct Embed -->
+                    <div class="card settings-card">
+                        <h3>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 0.5rem;">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Google Sites Direct Embed
+                        </h3>
+                        <p>Generate and copy the entire self-contained console code (with your active contracts baked in) to paste directly into your Google Sites "Embed Code" box, bypassing GitHub completely.</p>
+                        <div class="settings-actions" style="gap: 0.8rem; flex-wrap: wrap;">
+                            <button id="copy-bounties-code-btn" class="btn btn-accent">Copy Bounties Code</button>
+                            <button id="copy-wanted-code-btn" class="btn btn-secondary">Copy Wanted Posters Code</button>
+                            <button id="copy-leaderboard-code-btn" class="btn btn-secondary">Copy Leaderboard Code</button>
+                            <button id="copy-portal-code-btn" class="btn btn-secondary">Copy Full Portal Code</button>
+                        </div>
+                    </div>
+
+                    <!-- Sandbox Actions -->
+                    <div class="card settings-card">
+                        <h3>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 0.5rem;"><path d="M10 2v7.31L3.75 20a1 1 0 0 0 .85 1.5h14.8a1 1 0 0 0 .85-1.5L14 9.31V2zM8.5 2h7M7 16h10"/></svg>
+                            Sandbox Controls
+                        </h3>
+                        <p>Wipe weekly history while keeping player rosters, or load pre-configured mock data to see the hub in action.</p>
+                        <div class="settings-actions">
+                            <button id="load-presets-btn" class="btn btn-accent">Load Demo Presets</button>
+                            <button id="clear-db-btn" class="btn btn-danger">Wipe Weekly History</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL: BOUNTY DRAWING ROULETTE -->
+    <div id="roulette-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--accent-cyan)" stroke-width="2" style="vertical-align: middle; margin-right: 0.5rem;"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="3" fill="var(--accent-cyan)" opacity="0.3"/></svg>
+                    TARGET COORDINATE ACQUISITION
+                </h2>
+                <p>Locking in tracking fob targets across active divisions...</p>
+            </div>
+            <div class="modal-body">
+                <!-- Roulette wheels will be generated here -->
+                <div class="roulette-tracks-container" id="roulette-tracks"></div>
+            </div>
+            <div class="modal-footer hidden" id="roulette-modal-footer">
+                <button id="confirm-roll-btn" class="btn btn-accent btn-large">Confirm Targets</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT BOUNTY OUTCOME -->
+    <div id="bounty-edit-modal" class="modal hidden">
+        <div class="modal-overlay" id="edit-modal-overlay"></div>
+        <div class="modal-container modal-sm">
+            <div class="modal-header">
+                <h2>Log Capture Report</h2>
+                <p id="edit-bounty-subtitle">Division: Outer Rim | Target: Player A</p>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="bounty-status-select">Contract Status</label>
+                    <select id="bounty-status-select">
+                        <option value="pending">Hunting (Active Hit)</option>
+                        <option value="claimed">Captured (Carbonite Claims)</option>
+                        <option value="escaped">Evaded (Jumped to Hyperspace)</option>
+                        <option value="not_found">Not Found (Lost Track)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="hunter-select-group">
+                    <label for="bounty-hunter-select">Claimed By (Guild Hunter)</label>
+                    <div class="hunter-selection-row">
+                        <select id="bounty-hunter-select">
+                            <!-- Populated with players from rosters -->
+                        </select>
+                        <span class="or-divider">OR</span>
+                        <input type="text" id="bounty-hunter-custom" placeholder="Type custom name">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="bounty-reward-input">Bounty Value (Beskar Credits)</label>
+                    <input type="number" id="bounty-reward-input" min="0" value="8000">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="save-bounty-btn" class="btn btn-primary">Save Outcome</button>
+                <button id="cancel-bounty-edit" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SHARE CARD DISPLAY -->
+    <div id="share-card-modal" class="modal hidden">
+        <div class="modal-overlay" id="share-modal-overlay"></div>
+        <div class="modal-container share-container">
+            <div class="modal-header">
+                <h2>Share Weekly Standings</h2>
+                <p>Download or copy the generated graphic to post on your channels.</p>
+            </div>
+            <div class="modal-body share-body">
+                <!-- The actual DOM node that will be screenshotted -->
+                <div id="share-card-graphic" class="share-card-graphic">
+                    <div class="graphic-glow"></div>
+                    <div class="share-card-header">
+                        <img src="" class="share-brand-logo" alt="APA Logo">
+                        <div class="graphic-title-group">
+                            <span class="graphic-sub">BOUNTY BOARD SECTOR REPORT</span>
+                            <h2 id="share-week-title">CYCLE 1 SUMMARY</h2>
+                        </div>
+                    </div>
+                    
+                    <div class="share-card-list" id="share-bounties-list">
+                        <!-- Dynamic list of bounties -->
+                    </div>
+
+                    <div class="share-card-footer">
+                        <div class="meta-item">
+                            <span class="meta-label">DISPATCH</span>
+                            <span class="meta-val" id="share-meta-summary">2 CLAIMS / 1 ESCAPED</span>
+                        </div>
+                        <div class="meta-item branding">
+                            <span class="meta-label">GUILD CENTRAL</span>
+                            <span class="meta-val">UNDERWORLD NET</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="download-graphic-btn" class="btn btn-accent">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.3rem;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    Download Report
+                </button>
+                <button id="close-share-btn" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: WANTED POSTER GENERATOR -->
+    <div id="wanted-posters-modal" class="modal hidden">
+        <div class="modal-overlay" id="wanted-modal-overlay"></div>
+        <div class="modal-container wanted-posters-modal-container">
+            <div class="modal-header">
+                <h2>Wanted Poster Dispatch</h2>
+                <p>Generate wanted posters for pool playing skills to share on Facebook or the Website.</p>
+            </div>
+            <div class="modal-body wanted-posters-body">
+                <div class="posters-flex-container" style="justify-content: center;">
+                    
+                    <!-- Poster B: Imperial Security Hologram (Website 3:4) -->
+                    <div class="poster-preview-card" style="width: 400px; margin: 0 auto;">
+                        <h3>Wanted Death Mark</h3>
+                        <div style="width: 364px; height: 364px; display: flex; align-items: center; justify-content: center; overflow: visible;">
+                            <div id="poster-red-holo-element-wrapper" class="fb-post-wrapper" style="background-color: #000000; background-image: none;">
+                                <div id="poster-red-holo-element" class="wanted-poster-box poster-red-holo" style="transform: none; margin: 0;">
+                                    <div class="poster-red-holo-grid"></div>
+                                    <div class="poster-red-holo-border-accents"></div>
+                                    <div class="poster-red-holo-header">
+                                        <img src="" class="static-poster-brand-logo poster-brand-logo" alt="APA Logo">
+                                        <span class="alert-label-red">GUILD DEATH MARK</span>
+                                    </div>
+                                    <div class="poster-red-holo-photo-container">
+                                        <div class="photo-reticle-red">
+                                            <svg viewBox="0 0 100 100" width="80" height="80" class="reticle-svg-red">
+                                                <circle cx="50" cy="50" r="45" stroke="var(--accent-pink)" stroke-width="1" fill="none" stroke-dasharray="3 3"></circle>
+                                                <line x1="50" y1="0" x2="50" y2="100" stroke="var(--accent-pink)" stroke-width="0.5"></line>
+                                                <line x1="0" y1="50" x2="100" y2="50" stroke="var(--accent-pink)" stroke-width="0.5"></line>
+                                            </svg>
+                                        </div>
+                                        <div class="poster-avatar-placeholder-red" style="width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; color: var(--accent-pink);">
+                                            <!-- Dynamic Star Wars avatar silhouette will be injected here -->
+                                        </div>
+                                    </div>
+                                    <div class="poster-red-holo-info">
+                                        <div class="w-label-red">TARGET IDENTITY CONFIRMED</div>
+                                        <h2 class="poster-red-holo-name">RIGEL ROSS</h2>
+                                        <div class="poster-red-holo-sub">OPERATING WITH THE <span class="poster-red-holo-team">BULL ELK</span> FACTION</div>
+                                        <div class="poster-red-holo-div-tag">SECTOR: <span class="poster-red-holo-division">LOWER COLUMBIA</span></div>
+                                        <div class="poster-red-holo-crime-box">
+                                            <span class="crime-header-red">Pool Crime Registry:</span>
+                                            <p class="poster-red-holo-crime">Lethal trick shots and rack-wrecking.</p>
+                                        </div>
+                                    </div>
+                                    <div class="poster-red-holo-footer">
+                                        <div class="p-reward-title-red">REWARD FOR APPREHENSION</div>
+                                        <div class="p-reward-amount-red poster-red-holo-reward">₵8,000 Credits</div>
+                                        <div class="p-disclaimer-red">TERMINATE OR APPREHEND. AUTHORED BY GALACTIC EMPIRE UNDERWORLD DISPATCH.</div>
+                                    </div>
+                                </div>
+                                <div class="fb-post-watermark">APA GUILD CENTRAL DISPATCH</div>
+                            </div>
+                        </div>
+                        <button id="download-red-holo-btn" class="btn btn-accent" style="width: 100%; margin-top: 1rem;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.3rem;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                            Download Facebook Poster
+                        </button>
+                        <button id="share-red-fb-btn" class="btn btn-facebook" style="width: 100%; margin-top: 0.5rem; background-color: #1877f2; color: white; border: none;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: 0.3rem;"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                            Share on Facebook
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close-wanted-btn" class="btn btn-secondary">Close Terminal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: FACEBOOK SHARE INSTRUCTIONS -->
+    <div id="fb-share-instructions-modal" class="modal hidden">
+        <div class="modal-overlay" id="fb-share-overlay"></div>
+        <div class="modal-container modal-sm">
+            <div class="modal-header">
+                <h2>Post to Facebook</h2>
+                <p>Follow these quick steps to publish this wanted poster to your Facebook page:</p>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1.2rem; padding: 1rem 0;">
+                <div class="instruction-step" style="display: flex; gap: 0.8rem; align-items: flex-start;">
+                    <span class="step-num" style="background-color: var(--accent-cyan); color: #000; font-family: var(--font-display); font-weight: bold; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-shadow: none;">1</span>
+                    <p style="margin: 0; font-size: 0.9rem; color: var(--text-primary); text-transform: none;">The high-resolution wanted poster image **has been downloaded** to your computer.</p>
+                </div>
+                <div class="instruction-step" style="display: flex; gap: 0.8rem; align-items: flex-start;">
+                    <span class="step-num" style="background-color: var(--accent-cyan); color: #000; font-family: var(--font-display); font-weight: bold; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-shadow: none;">2</span>
+                    <p style="margin: 0; font-size: 0.9rem; color: var(--text-primary); text-transform: none;">A galactic wanted caption **has been copied to your clipboard** automatically.</p>
+                </div>
+                <div class="instruction-step" style="display: flex; gap: 0.8rem; align-items: flex-start;">
+                    <span class="step-num" style="background-color: var(--accent-cyan); color: #000; font-family: var(--font-display); font-weight: bold; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-shadow: none;">3</span>
+                    <p style="margin: 0; font-size: 0.9rem; color: var(--text-primary); text-transform: none;">Click **\"Go to Facebook\"** below, start a new post on your feed or page, paste (Ctrl+V) the caption, and upload the downloaded wanted poster PNG!</p>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 0.8rem; justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <button id="go-to-fb-btn" class="btn btn-primary">Go to Facebook</button>
+                <button id="close-fb-instructions-btn" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- App Script -->
+    <script src="state-bootstrap.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

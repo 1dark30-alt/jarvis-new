@@ -3,9 +3,10 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { loadServerSettings, saveServerSettings } from '../lib/serverSettings';
+import { BreezeSpeaker, type BreezeSettings } from '../lib/breeze-speech';
 
 type Message = { role: 'user' | 'assistant'; content: string };
-type SavedJarvisSettings = {
+type SavedJarvisSettings = BreezeSettings & {
   localLlmProvider?: 'ollama' | 'olares' | 'olares-shared';
   localLlmUrl?: string;
   localLlmModel?: string;
@@ -26,6 +27,9 @@ export default function LocalChatPage() {
   const [error, setError] = useState('');
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const speakerRef = useRef<BreezeSpeaker | null>(null);
+  if (!speakerRef.current) speakerRef.current = new BreezeSpeaker();
+  useEffect(() => () => speakerRef.current?.stop(), []);
 
   useEffect(() => {
     void (async () => {
@@ -104,6 +108,7 @@ export default function LocalChatPage() {
     event.preventDefault();
     const text = input.trim();
     if (!text || loading) return;
+    speakerRef.current?.stop();
     const nextMessages: Message[] = [...messages, { role: 'user', content: text }];
     setMessages(nextMessages);
     setInput('');
@@ -125,6 +130,9 @@ export default function LocalChatPage() {
       const data = await response.json() as { reply?: string; error?: string };
       if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
       setMessages([...nextMessages, { role: 'assistant', content: data.reply ?? '' }]);
+      if (settings.ttsProvider === 'olares' && data.reply) {
+        void speakerRef.current?.speak(data.reply, settings).catch(err => setError(`Speech: ${String(err)}`));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -143,6 +151,7 @@ export default function LocalChatPage() {
       </header>
 
       <section className="w-full max-w-4xl mx-auto flex-1 flex flex-col px-4 py-5 min-h-0">
+        {settings.ttsProvider === 'olares' && <button onClick={() => speakerRef.current?.stop()} className="self-end text-xs text-cyan-400 mb-2">Stop speech</button>}
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <input
             aria-label="Ollama address"

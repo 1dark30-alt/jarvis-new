@@ -8,3 +8,7 @@ dist/
 jarvis-server-settings.json
 tsconfig.tsbuildinfo
 social-captures/
+services/.runtime/
+services/gods-eye-view/jarvis-service.log
+.bambu-token.json
+network-devices.json

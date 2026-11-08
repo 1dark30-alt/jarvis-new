@@ -16,6 +16,9 @@ import { OriginalVisualizer } from './visualizers/OriginalVisualizer';
 import { PhotoWidget, PhotoEntry } from './PhotoWidget';
 import { sfx } from '../lib/sfx';
 import { installErrorInterceptors, emitError } from '../lib/errorBus';
+import { BreezeSpeaker } from '../lib/breeze-speech';
+import { LocalVoice } from '../lib/local-voice';
+import { GeminiLive } from '../lib/geminiLive';
 import { loadServerSettings, saveServerSettings } from '../lib/serverSettings';
 import { ModelViewerWidget } from './ModelViewerWidget';
 import { isInterfaceLocked } from './LockScreen';
@@ -47,6 +50,11 @@ const DEFAULT_SETTINGS: JarvisSettings = {
   enabledFunctions: [
     'desktop_mode', 'navigate_to_page', 'jarvis_disconnect',
     'lock_interface', 'set_timer', 'set_reminder', 'hud_layout', 'briefing', 'set_theme', 'ambient_mode',
+    'routine_command', 'undo_command', 'build_guide', 'background_tasks',
+    'memory_command', 'project_workspace',
+    'screen_eyes', 'dev_command', 'health_command',
+    'excel_writer', 'document_review', 'obsidian_vault', 'market_analyzer',
+    'screen_agent', 'network_radar', 'notifications_command',
   ],
   wakeWordEnabled: false,
   wakeWordSensitivity: 0.5,
@@ -74,6 +82,10 @@ function isDesktopPanelPosition(value: unknown): value is DesktopPanelPosition {
 export function JarvisAssistant({ compact = false, roundDisplay = false }: { compact?: boolean; roundDisplay?: boolean }) {
   const [status, setStatus] = useState<'idle' | 'listening' | 'active' | 'error'>('idle');
   const [lastError, setLastError] = useState<string | null>(null);
+  const [localPhase, setLocalPhase] = useState('');
+  const localVoiceRef = useRef<LocalVoice | null>(null);
+  const geminiRef = useRef<GeminiLive | null>(null);
+  useEffect(() => () => localVoiceRef.current?.stop(), []);
   const [micMuted, setMicMuted] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [fftData, setFftData] = useState<number[]>(new Array(FFT_BARS).fill(0));
@@ -186,6 +198,9 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
   const desktopPanelPositionRef = useRef<DesktopPanelPosition>('bottom-right');
   const normalPositionBeforeDesktopRef = useRef<JarvisSettings['position'] | null>(null);
   const settingsRef = useRef(settings);
+  const breezeRef = useRef<BreezeSpeaker | null>(null);
+  if (!breezeRef.current) breezeRef.current = new BreezeSpeaker();
+  useEffect(() => () => breezeRef.current?.stop(), []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setMounted(true), 0);
@@ -604,6 +619,29 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
     return () => window.removeEventListener('jarvis:set-theme', handler);
   }, []);
 
+  // Long-term memory — the prompt core block (identity + recent facts + an
+  // index of everything else) rides in the session instructions. Refreshed on
+  // mount and whenever a memory tool saves something.
+  const memoryBlockRef = useRef('');
+  useEffect(() => {
+    const load = () => {
+      fetch('/api/memory?op=core')
+        .then((r) => r.json())
+        .then((d: { block?: string }) => { memoryBlockRef.current = d.block ?? ''; })
+        .catch(() => {});
+    };
+    load();
+    window.addEventListener('jarvis:memory-updated', load);
+    return () => window.removeEventListener('jarvis:memory-updated', load);
+  }, []);
+
+  // Broadcast voice state for proactive services (routine engine etc.)
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('jarvis:voice-state', {
+      detail: { connected: status === 'active' || status === 'listening' },
+    }));
+  }, [status]);
+
   // Load settings — server first (shared across all LAN clients), then localStorage fallback
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -632,9 +670,7 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
             setSettings(nextSettings);
 
             // Back-fill localStorage so offline / Electron still works
-            if (!localRaw) {
-              localStorage.setItem('jarvis_settings', JSON.stringify(nextSettings));
-            }
+            localStorage.setItem('jarvis_settings', JSON.stringify(nextSettings));
 
             // If localStorage has credentials but the server doesn't, push them up now.
             // This self-heals after a race-condition wipe.
@@ -916,6 +952,7 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
 
       // Handle remote audio
       pc.ontrack = (ev) => {
+        if (currentSettings.ttsProvider === 'olares') return;
         const [remoteStream] = ev.streams;
         remoteStreamRef.current = remoteStream;
         const audio = remoteAudioRef.current;
@@ -942,6 +979,7 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
         type: 'realtime',
         model,
         instructions: currentSettings.initialPrompt,
+        ...(currentSettings.ttsProvider === 'olares' && { output_modalities: ['text'] }),
         audio: {
           output: {
             voice: currentSettings.voice ?? 'echo',
@@ -982,9 +1020,12 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
         const sessionConfig = {
           type: 'session.update',
           session: {
-            voice: currentSettings.voice,
+            ...(currentSettings.ttsProvider === 'olares'
+              ? { type: 'realtime', output_modalities: ['text'] }
+              : { voice: currentSettings.voice }),
             instructions:
               currentSettings.initialPrompt +
+              (memoryBlockRef.current || '') +
               '\n\nDo not call navigate_to_page as part of a greeting or on your own initiative — only call it when the user explicitly asks to go to a different page.',
             ...(enabledTools.length > 0 && { tools: enabledTools }),
           },
@@ -1006,6 +1047,21 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
       dc.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
+
+          if (currentSettings.ttsProvider === 'olares') {
+            if (data.type === 'input_audio_buffer.speech_started') breezeRef.current?.stop();
+            if (data.type === 'response.done' && data.response?.status === 'completed') {
+              const text = (data.response.output ?? [])
+                .filter((item: { type: string; role?: string }) => item.type === 'message' && item.role === 'assistant')
+                .flatMap((item: { content?: { type: string; text?: string }[] }) => item.content ?? [])
+                .filter((part: { type: string }) => part.type === 'output_text')
+                .map((part: { text?: string }) => part.text ?? '').join('\n');
+              if (text) {
+                dispatchTranscript('jarvis', text);
+                void breezeRef.current?.speak(text, currentSettings).catch(error => emitError('app', `Breeze TTS: ${String(error)}`, 'error'));
+              }
+            }
+          }
 
           if (data.type === 'error') {
             console.error('OpenAI Error:', data.error);
@@ -1161,7 +1217,7 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
       }
 
       const overrideAgent: Record<string, unknown> = {};
-      if (currentSettings.initialPrompt) overrideAgent.prompt = { prompt: currentSettings.initialPrompt };
+      if (currentSettings.initialPrompt) overrideAgent.prompt = { prompt: currentSettings.initialPrompt + (memoryBlockRef.current || '') };
       if (currentSettings.elevenLabsFirstMessage?.trim()) overrideAgent.firstMessage = currentSettings.elevenLabsFirstMessage.trim();
       const overrides = Object.keys(overrideAgent).length > 0 ? { agent: overrideAgent } : undefined;
 
@@ -1179,14 +1235,116 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
   }
 
   async function start(currentSettings = settings) {
-    if ((currentSettings.apiMode ?? 'openai') === 'elevenlabs') {
+    if (currentSettings.apiMode === 'local') {
+      localVoiceRef.current?.stop();
+      setLastError(null); setStatus('listening');
+      if (!currentSettings.localLlmModel || !currentSettings.localLlmUrl) {
+        setLastError('Configure your Local Model Service in Settings.'); setStatus('error'); return;
+      }
+      const voice = new LocalVoice(currentSettings, {
+        phase: setLocalPhase, transcript: dispatchTranscript,
+        error: message => { setLastError(message); emitError('app', message); },
+        level: value => { setAudioLevel(value); setFftData(new Array(FFT_BARS).fill(value)); },
+      });
+      localVoiceRef.current = voice;
+      window.electron?.setWakeWordMicInUse?.(true);
+      try {
+        await voice.start();
+        if (localVoiceRef.current === voice) { setStatus('active'); setMicMuted(false); micMutedRef.current = false; }
+      } catch (error) {
+        if (localVoiceRef.current !== voice) return;
+        voice.stop(); localVoiceRef.current = null;
+        window.electron?.setWakeWordMicInUse?.(false);
+        setLastError(String(error)); setStatus('error');
+      }
+    } else if ((currentSettings.apiMode ?? 'openai') === 'gemini') {
+      await startGemini(currentSettings);
+    } else if ((currentSettings.apiMode ?? 'openai') === 'elevenlabs') {
       await startElevenLabs(currentSettings);
     } else {
       await startRealtime(currentSettings);
     }
   }
 
+  /** Gemini Live — Mark 58's voice engine, wired to all Jarvis tools. */
+  async function startGemini(currentSettings = settings) {
+    if (!currentSettings.geminiApiKey?.trim()) {
+      setLastError('Add a Gemini API key in Settings to use the Gemini Live engine.');
+      setStatus('error');
+      return;
+    }
+    disconnect();
+    setStatus('listening');
+    setLastError(null);
+    window.electron?.setWakeWordMicInUse?.(true);
+
+    const allFunctions = dynamicState.loaded ? dynamicState.allFunctions : FUNCTION_REGISTRY;
+    // Gemini rejects a whole tool set over one bad name — "3d_printing" (digit
+    // first) or MCP names with dots would silently poison every connection.
+    const validToolName = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/;
+    const tools = allFunctions
+      .filter((fn) => currentSettings.enabledFunctions.includes(fn.name) && validToolName.test(fn.tool.name))
+      .map((fn) => ({ name: fn.tool.name, description: fn.tool.description, parameters: fn.tool.parameters }));
+
+    const session = new GeminiLive(
+      currentSettings.geminiApiKey.trim(),
+      currentSettings.initialPrompt +
+        (memoryBlockRef.current || '') +
+        '\n\nDo not call navigate_to_page as part of a greeting or on your own initiative — only call it when the user explicitly asks to go to a different page.',
+      tools,
+      {
+        onStatus: (s) => {
+          if (s === 'active') {
+            sessionStartTimeRef.current = Date.now();
+            setStatus('active');
+            setMicMuted(false);
+            micMutedRef.current = false;
+          } else if (s === 'connecting') {
+            setStatus('listening');
+          }
+        },
+        onTranscript: dispatchTranscript,
+        onLevel: (value) => {
+          setAudioLevel(value);
+          setFftData(new Array(FFT_BARS).fill(value));
+        },
+        onError: (message) => { setLastError(message); emitError('app', message, 'error'); },
+        onClosed: () => { setStatus('idle'); window.electron?.setWakeWordMicInUse?.(false); },
+        callTool: async (name, args) => {
+          const fn = dynamicGetFunctionByNameRef.current(name);
+          if (!fn) return { result: { error: `Unknown tool: ${name}` } };
+          const msSinceSessionStart = Date.now() - sessionStartTimeRef.current;
+          if (name === 'navigate_to_page' && msSinceSessionStart < 6000) {
+            console.warn('[Jarvis] Blocked early navigate_to_page call (auto-reconnect guard).');
+            return { result: { success: true, navigated_to: args.page } };
+          }
+          const result = (isInterfaceLocked() && !LOCK_ALLOWED_FUNCTIONS.has(name))
+            ? LOCKED_RESULT
+            : await fn.handler(args);
+          const resultObj = result as Record<string, unknown> & { imageBase64?: string };
+          if (typeof resultObj?.error === 'string') {
+            emitError('function', `${name}(): ${resultObj.error}`, 'error');
+          }
+          if (name !== 'control_hud' && name !== 'show_hud_text') sfx('notification', 0.6);
+          const { imageBase64, ...textResult } = resultObj;
+          return { result: textResult, imageBase64 };
+        },
+      },
+    );
+    geminiRef.current = session;
+    try {
+      await session.start();
+    } catch (error) {
+      if (geminiRef.current !== session) return;
+      session.stop(); geminiRef.current = null;
+      window.electron?.setWakeWordMicInUse?.(false);
+      setLastError(String(error)); setStatus('error');
+    }
+  }
+
   function disconnect() {
+    localVoiceRef.current?.stop(); localVoiceRef.current = null; setLocalPhase('');
+    breezeRef.current?.stop();
     console.log(
       `%c[Jarvis] disconnect() called at ${new Date().toLocaleTimeString()} — stack: ${new Error().stack?.split('\n')[2]?.trim() ?? 'unknown'}`,
       'background:#2d0a0a;color:#ff6b6b;font-weight:bold;padding:2px 6px;border-radius:3px'
@@ -1196,6 +1354,11 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
+    }
+    // Gemini Live cleanup
+    if (geminiRef.current) {
+      geminiRef.current.stop();
+      geminiRef.current = null;
     }
     // OpenAI WebRTC cleanup
     if (peerConnectionRef.current) {
@@ -1224,6 +1387,11 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
   function setMicrophoneMuted(muted: boolean) {
     micMutedRef.current = muted;
     setMicMuted(muted);
+    if (localVoiceRef.current) {
+      localVoiceRef.current.setMuted(muted);
+      if (desktopModeRef.current) window.electron?.setDesktopPanelMuted?.(muted);
+      return;
+    }
 
     localAudioStreamRef.current?.getAudioTracks().forEach((track) => {
       track.enabled = !muted;
@@ -1284,7 +1452,9 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
     const mode = settings.apiMode ?? 'openai';
     const shouldStart =
       (mode === 'elevenlabs' && !!settings.elevenLabsAgentId?.trim()) ||
-      (mode === 'openai' && !!settings.apiKey);
+      (mode === 'openai' && !!settings.apiKey) ||
+      (mode === 'gemini' && !!settings.geminiApiKey?.trim()) ||
+      (mode === 'local' && !!settings.localLlmModel && !!settings.localLlmUrl);
 
     console.log(
       `%c[Jarvis] Auto-start effect fired at ${new Date().toLocaleTimeString()} — restartTrigger=${restartTrigger}, shouldStart=${shouldStart}, mode=${mode}`,
@@ -1311,9 +1481,13 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
     const hasCredentials =
       (newSettings.apiMode === 'openai'      && !!newSettings.apiKey?.trim()) ||
       (newSettings.apiMode === 'elevenlabs'  && !!newSettings.elevenLabsAgentId?.trim()) ||
+      (newSettings.apiMode === 'gemini'      && !!newSettings.geminiApiKey?.trim()) ||
+      !!newSettings.geminiApiKey?.trim() ||
+      !!newSettings.geminiProviderUrl?.trim() ||
       !!newSettings.localLlmModel?.trim() ||
       (newSettings.localLlmProvider === 'olares' && !!newSettings.localLlmApiKey?.trim()) ||
-      newSettings.localLlmProvider === 'olares-shared';
+      newSettings.localLlmProvider === 'olares-shared' ||
+      (newSettings.ttsProvider === 'olares' && !!newSettings.ttsRouterApiKey?.trim());
     if (hasCredentials) {
       saveServerSettings({ jarvis_settings: serialised });
     }
@@ -1619,7 +1793,7 @@ export function JarvisAssistant({ compact = false, roundDisplay = false }: { com
                 {status === 'listening' ? (
                   'Establishing connection...'
                 ) : status === 'active' ? (
-                  'J.A.R.V.I.S. is online. Click status to disconnect.'
+                  settings.apiMode === 'local' ? `${localPhase}${lastError ? ` · ${lastError}` : ''}` : 'J.A.R.V.I.S. is online. Click status to disconnect.'
                 ) : status === 'error' ? (
                   <>
                     Connection error. Check Settings.

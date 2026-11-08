@@ -12,12 +12,16 @@
   },
   "dependencies": {
     "@elevenlabs/react": "^1.4.0",
+    "@google/genai": "^3.0.0",
     "@picovoice/porcupine-node": "^4.0.2",
     "@picovoice/pvrecorder-node": "^1.2.8",
     "@types/leaflet": "^1.9.21",
+    "exceljs": "^4.4.0",
     "leaflet": "^1.9.4",
+    "mammoth": "^1.13.0",
     "mqtt": "^5.15.1",
     "node-hid": "^3.4.0",
+    "pdf-parse": "^2.4.5",
     "smart-buffer": "^4.2.0"
   },
   "devDependencies": {

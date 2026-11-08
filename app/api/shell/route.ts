@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { captureBefore, captureAfter } from '../../lib/server/shellUndo';
 
 const TIMEOUT_MS = 30_000;
 
@@ -170,10 +171,19 @@ function runCommand(
             .join(':'),
         };
 
-    const proc = spawn(shell, args, {
-      env,
-      ...(isWin && {
-        windowsHide: true,
+    // cmd.exe quirk: Node escapes embedded quotes as \" when building the
+    // command line, but cmd treats backslash-quote as a literal — so every
+    // quoted path was mangled. With /s, cmd strips only the outer quotes we
+    // add here and passes everything between verbatim.
+    const isCmd = isWin && args[0] === '/d';
+    const proc = spawn(
+      shell,
+      isCmd ? [`/d /s /c "${command}"`] : args,
+      {
+        env,
+        ...(isWin && {
+          windowsHide: true,
+          ...(isCmd && { windowsVerbatimArguments: true }),
         cwd:
           process.env.USERPROFILE ||
           (process.env.SystemDrive ? `${process.env.SystemDrive}\\` : 'C:\\'),
@@ -229,8 +239,10 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[shell] Running: ${command}`);
+    await captureBefore(command);
     const result = await runCommand(command, shellPathOverride);
     console.log(`[shell] Exit ${result.exitCode} | stdout: ${result.stdout.slice(0, 200)}`);
+    await captureAfter(command, result.exitCode).catch(() => {});
 
     return NextResponse.json(result);
   } catch (err) {

@@ -174,7 +174,7 @@ export async function GET() {
   try {
     if (isWindowsMediaHost()) {
       const win = await getWindowsNowPlaying();
-      if (win.ok) return NextResponse.json(win.track);
+      if (win.ok === true) return NextResponse.json(win.track);
       return NextResponse.json({ error: win.error });
     }
 
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Missing command' }, { status: 400 });
       }
       const r = await controlWindowsMedia(command, value);
-      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+      if (r.ok === false) return NextResponse.json({ error: r.error }, { status: 400 });
       return NextResponse.json({ success: true, command, app: 'Windows' });
     }
 

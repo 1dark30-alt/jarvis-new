@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { PageHeader } from '../PageHeader';
 import type { JarvisSettings } from '../SettingsModal';
+import { breezePayload } from '../../lib/breeze-speech';
 
-type Provider = 'openai' | 'elevenlabs';
+type Provider = 'openai' | 'elevenlabs' | 'olares';
 
 const OPENAI_VOICES = [
   'alloy', 'ash', 'ballad', 'coral', 'echo',
@@ -36,7 +37,11 @@ function slugifyFilename(text: string): string {
 export function AudioTestPage({ onNavigateHome }: Props) {
   const settings = useMemo(() => loadSettings(), []);
   const [provider, setProvider] = useState<Provider>(
-    (settings.apiMode as Provider | undefined) ?? 'openai'
+    settings.ttsProvider === 'olares' || settings.apiMode === 'local'
+      ? 'olares'
+      : settings.apiMode === 'elevenlabs' || settings.apiMode === 'gemini'
+        ? (settings.apiMode as Provider)
+        : 'openai'
   );
   const [text, setText] = useState(
     'Good evening, sir. All systems are online and ready for your command.'
@@ -94,7 +99,7 @@ export function AudioTestPage({ onNavigateHome }: Props) {
     }
 
     const payload =
-      provider === 'openai'
+      provider === 'olares' ? breezePayload(settings, trimmed) : provider === 'openai'
         ? {
             provider: 'openai' as const,
             text: trimmed,
@@ -115,7 +120,7 @@ export function AudioTestPage({ onNavigateHome }: Props) {
       setError('OpenAI API key missing — add it in Settings.');
       return null;
     }
-    if (provider === 'elevenlabs' && !payload.elevenLabsApiKey) {
+    if (provider === 'elevenlabs' && !settings.elevenLabsApiKey) {
       setError(
         'ElevenLabs API key missing — add it in Settings → Voice Engine (needed for TTS / MP3 export). The Agent ID alone cannot generate downloadable audio.'
       );
@@ -123,7 +128,7 @@ export function AudioTestPage({ onNavigateHome }: Props) {
     }
 
     setBusy(true);
-    setStatus(provider === 'openai' ? 'Synthesizing with OpenAI…' : 'Synthesizing with ElevenLabs…');
+    setStatus(provider === 'olares' ? 'Synthesizing with Breeze via Olares Router…' : provider === 'openai' ? 'Synthesizing with OpenAI…' : 'Synthesizing with ElevenLabs…');
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
@@ -187,10 +192,11 @@ export function AudioTestPage({ onNavigateHome }: Props) {
     if (!blob) return;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = slugifyFilename(text);
+    a.download = slugifyFilename(text).replace(/\.mp3$/, blob.type.includes('wav') ? '.wav' : blob.type.includes('ogg') ? '.ogg' : '.mp3');
     document.body.appendChild(a);
     a.click();
     a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     setStatus(`Saved ${a.download}`);
   }, [lastBlob, synthesize, text]);
 
@@ -234,6 +240,7 @@ export function AudioTestPage({ onNavigateHome }: Props) {
               {([
                 { id: 'openai' as const, label: 'OpenAI' },
                 { id: 'elevenlabs' as const, label: 'ElevenLabs' },
+                { id: 'olares' as const, label: 'Breeze · Olares' },
               ]).map((opt) => {
                 const active = provider === opt.id;
                 return (
@@ -259,7 +266,7 @@ export function AudioTestPage({ onNavigateHome }: Props) {
               })}
             </div>
             <p className="font-mono text-[10px] text-white/30 leading-relaxed">
-              {provider === 'openai'
+              {provider === 'olares' ? 'Uses the speech model and Router connection configured in Settings → Speech Output.' : provider === 'openai'
                 ? `Uses your OpenAI key and the "${voice}" voice from Settings.`
                 : 'Uses your ElevenLabs API key + Agent voice (exact TTS, downloadable as MP3).'}
             </p>

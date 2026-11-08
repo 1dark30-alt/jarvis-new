@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-type Provider = 'openai' | 'elevenlabs';
+type Provider = 'openai' | 'elevenlabs' | 'olares';
 
 interface TtsBody {
   /** 'speak' (default) synthesizes audio; 'resolve-voice' returns the agent's voice id */
   action?: 'speak' | 'resolve-voice';
   provider?: Provider;
+  baseUrl?: string;
+  model?: string;
   text?: string;
   /** OpenAI voice id */
   voice?: string;
@@ -107,6 +109,9 @@ export async function POST(req: NextRequest) {
   }
 
   const provider = body.provider ?? 'openai';
+  if (!['openai', 'elevenlabs', 'olares'].includes(provider)) {
+    return NextResponse.json({ error: 'Unsupported TTS provider' }, { status: 400 });
+  }
 
   // Resolve agent → voice id without synthesizing
   if (body.action === 'resolve-voice') {
@@ -131,6 +136,42 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    if (provider === 'olares') {
+      if (!body.baseUrl?.trim() || !body.apiKey?.trim()) {
+        return NextResponse.json({ error: 'Enter the Olares Router Base URL and API key in Settings → Speech Output.' }, { status: 400 });
+      }
+      let base: URL;
+      try { base = new URL(body.baseUrl.trim()); } catch {
+        return NextResponse.json({ error: 'Invalid Router Base URL.' }, { status: 400 });
+      }
+      if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search || base.hash) {
+        return NextResponse.json({ error: 'Use an HTTP or HTTPS Router Base URL without embedded credentials, query, or fragment.' }, { status: 400 });
+      }
+      const root = base.href.replace(/\/+$/, '').replace(/\/v1$/, '');
+      const voice = body.voice?.trim() || 'en-m';
+      const res = await fetch(`${root}/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`, {
+        method: 'POST', redirect: 'error',
+        headers: { Authorization: `Bearer ${body.apiKey.trim()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_id: body.model?.trim() || 'default-tts', text }),
+        signal: AbortSignal.any([req.signal, AbortSignal.timeout(120000)]),
+      });
+      if (!res.ok) {
+        // Avoid echoing upstream diagnostics that might contain private connection details.
+        return NextResponse.json({ error: `Olares speech request failed (HTTP ${res.status}). Check Router's Breeze model, API key permissions, and connection example.` }, { status: 502 });
+      }
+      const type = res.headers.get('content-type')?.split(';')[0] || '';
+      if (!type.startsWith('audio/') && type !== 'application/octet-stream') {
+        return NextResponse.json({ error: 'Router returned no audio. Check the speech endpoint and model in its connection example.' }, { status: 502 });
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (!buf.length) return NextResponse.json({ error: 'Router returned empty audio.' }, { status: 502 });
+      const extension = type.includes('wav') ? 'wav' : type.includes('ogg') ? 'ogg' : 'mp3';
+      return new NextResponse(buf, { headers: {
+        'Content-Type': type === 'application/octet-stream' ? 'audio/mpeg' : type,
+        'Content-Disposition': `attachment; filename="jarvis-speech.${extension}"`,
+        'Cache-Control': 'no-store', 'X-Jarvis-Provider': 'olares',
+      } });
+    }
     if (provider === 'openai') {
       const apiKey = (body.apiKey ?? '').trim();
       if (!apiKey) {

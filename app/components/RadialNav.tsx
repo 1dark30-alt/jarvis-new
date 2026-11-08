@@ -64,6 +64,39 @@ const PAGE_ITEMS: { page: string; label: string; icon: React.ReactNode }[] = [
   { page: 'round-display', label: 'Round HUD', icon: (
     <svg {...ICON_PROPS}><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4" /></svg>
   ) },
+  { page: 'bounty-hunter', label: 'Bounty Hunter', icon: (
+    <svg {...ICON_PROPS}><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" fill="currentColor" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+  ) },
+  { page: 'wildcard-draw', label: 'Wildcard Draw', icon: (
+    <svg {...ICON_PROPS}><rect x="3" y="5" width="10" height="14" rx="1.5" /><path d="M13 4.5 19 6l-3.2 13.2" /><path d="M6 9h4M6 12.5h4" /></svg>
+  ) },
+  { page: 'gods-eye', label: "God's Eye", icon: (
+    <svg {...ICON_PROPS}><circle cx="12" cy="12" r="3" /><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" /></svg>
+  ) },
+  { page: 'disk-map', label: 'Disk Map', icon: (
+    <svg {...ICON_PROPS}><rect x="3" y="3" width="11" height="11" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="10" width="7" height="11" /><rect x="3" y="14" width="11" height="7" /></svg>
+  ) },
+  { page: 'build-guide', label: 'Build Guide', icon: (
+    <svg {...ICON_PROPS}><path d="M14 3v18M3 8h8M3 16h8M17 8h4M17 16h4" /><circle cx="12" cy="8" r="0" /><path d="M11 6.5 14 8l-3 1.5zM11 14.5 14 16l-3 1.5z" /></svg>
+  ) },
+  { page: 'missions', label: 'Missions', icon: (
+    <svg {...ICON_PROPS}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><path d="M12 3v4M12 17v4M3 12h4M17 12h4" /></svg>
+  ) },
+  { page: 'memory', label: 'Memory', icon: (
+    <svg {...ICON_PROPS}><path d="M12 5a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V8a3 3 0 0 0-3-3z" /><path d="M7 9a5 5 0 0 1 10 0M4.5 11a7.5 7.5 0 0 1 15 0" /></svg>
+  ) },
+  { page: 'health', label: 'Health', icon: (
+    <svg {...ICON_PROPS}><path d="M12 21s-7.5-4.6-9.5-9A5.4 5.4 0 0 1 12 6.2 5.4 5.4 0 0 1 21.5 12c-2 4.4-9.5 9-9.5 9z" /><path d="M6 12h4l2-4 3 7 1.5-3H18" /></svg>
+  ) },
+  { page: 'dev-mode', label: 'Developer', icon: (
+    <svg {...ICON_PROPS}><path d="M8 6 3 12l5 6M16 6l5 6-5 6M13 5l-2 14" /></svg>
+  ) },
+  { page: 'market', label: 'Market', icon: (
+    <svg {...ICON_PROPS}><path d="M4 20V10M10 20V4M16 20v-8M22 20V8" /><path d="M3 20h20" /></svg>
+  ) },
+  { page: 'network-radar', label: 'Network', icon: (
+    <svg {...ICON_PROPS}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /><circle cx="16.5" cy="7.5" r="1.3" fill="currentColor" /><circle cx="7" cy="16" r="1.3" fill="currentColor" /></svg>
+  ) },
 ];
 
 /**

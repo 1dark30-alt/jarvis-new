@@ -11,6 +11,7 @@ import { RadialNav } from "./components/RadialNav";
 import { CommandPalette } from "./components/CommandPalette";
 import { AmbientMode } from "./components/AmbientMode";
 import { LockController } from "./components/LockScreen";
+import { RoutineAgent } from "./components/RoutineAgent";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { NewsPage } from "./components/pages/NewsPage";
 import { CalendarPage } from "./components/pages/CalendarPage";
@@ -66,9 +67,74 @@ const AudioTestPage = dynamic(
   { ssr: false }
 );
 
-type JarvisPage = 'home' | 'news' | 'map' | 'calendar' | 'home-assistant' | '3d-printers' | 'music' | 'round-display' | 'spiderman' | 'manufacturing' | 'webshooter' | 'social' | 'audio-test';
+// Local web apps ported from the JARVIS-system plugin collection
+const BountyHunterPage = dynamic(
+  () => import('./components/pages/BountyHunterPage').then((m) => ({ default: m.BountyHunterPage })),
+  { ssr: false }
+);
 
-const VALID_PAGES: JarvisPage[] = ['home', 'news', 'map', 'calendar', 'home-assistant', '3d-printers', 'music', 'round-display', 'spiderman', 'manufacturing', 'webshooter', 'social', 'audio-test'];
+const WildcardDrawPage = dynamic(
+  () => import('./components/pages/WildcardDrawPage').then((m) => ({ default: m.WildcardDrawPage })),
+  { ssr: false }
+);
+
+// God's Eye — satellite intelligence console (own Vite service on port 4173)
+const GodsEyePage = dynamic(
+  () => import('./components/pages/GodsEyePage').then((m) => ({ default: m.GodsEyePage })),
+  { ssr: false }
+);
+
+// Disk Map — live treemap of disk usage (scanner streams from /api/disk-map)
+const DiskMapPage = dynamic(
+  () => import('./components/pages/DiskMapPage').then((m) => ({ default: m.DiskMapPage })),
+  { ssr: false }
+);
+
+// Build Guide — wiring diagrams drawn from a structured plan
+const BuildGuidePage = dynamic(
+  () => import('./components/pages/BuildGuidePage').then((m) => ({ default: m.BuildGuidePage })),
+  { ssr: false }
+);
+
+// Missions — background agents working while the conversation goes on
+const MissionsPage = dynamic(
+  () => import('./components/pages/MissionsPage').then((m) => ({ default: m.MissionsPage })),
+  { ssr: false }
+);
+
+// Memory — every stored fact, when it was learned, one-click delete
+const MemoryPage = dynamic(
+  () => import('./components/pages/MemoryPage').then((m) => ({ default: m.MemoryPage })),
+  { ssr: false }
+);
+
+// Health — machine gauges + service checks, no model call needed
+const HealthPage = dynamic(
+  () => import('./components/pages/HealthPage').then((m) => ({ default: m.HealthPage })),
+  { ssr: false }
+);
+
+// Developer — allowlisted engineering jobs with outputs
+const DevModePage = dynamic(
+  () => import('./components/pages/DevModePage').then((m) => ({ default: m.DevModePage })),
+  { ssr: false }
+);
+
+// Market — candles + deterministic engine stats (Yahoo Finance)
+const MarketPage = dynamic(
+  () => import('./components/pages/MarketPage').then((m) => ({ default: m.MarketPage })),
+  { ssr: false }
+);
+
+// Network Radar — devices + connection quality on a live radar
+const NetworkRadarPage = dynamic(
+  () => import('./components/pages/NetworkRadarPage').then((m) => ({ default: m.NetworkRadarPage })),
+  { ssr: false }
+);
+
+type JarvisPage = 'home' | 'news' | 'map' | 'calendar' | 'home-assistant' | '3d-printers' | 'music' | 'round-display' | 'spiderman' | 'manufacturing' | 'webshooter' | 'social' | 'audio-test' | 'bounty-hunter' | 'wildcard-draw' | 'gods-eye' | 'disk-map' | 'build-guide' | 'missions' | 'memory' | 'health' | 'dev-mode' | 'market' | 'network-radar';
+
+const VALID_PAGES: JarvisPage[] = ['home', 'news', 'map', 'calendar', 'home-assistant', '3d-printers', 'music', 'round-display', 'spiderman', 'manufacturing', 'webshooter', 'social', 'audio-test', 'bounty-hunter', 'wildcard-draw', 'gods-eye', 'disk-map', 'build-guide', 'missions', 'memory', 'health', 'dev-mode', 'market', 'network-radar'];
 
 interface BuildModel { file: string; name: string; sub: string }
 
@@ -221,6 +287,39 @@ export default function Home() {
         {currentPage === 'audio-test' && (
           <AudioTestPage key="audio-test" onNavigateHome={() => setCurrentPage('home')} />
         )}
+        {currentPage === 'bounty-hunter' && (
+          <BountyHunterPage key="bounty-hunter" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'wildcard-draw' && (
+          <WildcardDrawPage key="wildcard-draw" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'gods-eye' && (
+          <GodsEyePage key="gods-eye" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'disk-map' && (
+          <DiskMapPage key="disk-map" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'build-guide' && (
+          <BuildGuidePage key="build-guide" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'missions' && (
+          <MissionsPage key="missions" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'memory' && (
+          <MemoryPage key="memory" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'health' && (
+          <HealthPage key="health" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'dev-mode' && (
+          <DevModePage key="dev-mode" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'market' && (
+          <MarketPage key="market" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'network-radar' && (
+          <NetworkRadarPage key="network-radar" onNavigateHome={() => setCurrentPage('home')} />
+        )}
       </AnimatePresence>
 
       {/* Global chrome — radial nav, palette, toasts, ambient, lock */}
@@ -229,6 +328,7 @@ export default function Home() {
           <RadialNav currentPage={currentPage} />
           <CommandPalette />
           <NotificationLayer />
+          <RoutineAgent />
           <AmbientMode />
           <OnboardingWizard />
           <LockController />

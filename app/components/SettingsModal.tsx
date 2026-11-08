@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { FUNCTION_REGISTRY, JarvisFunction } from '../lib/functions';
 import { sfx } from '../lib/sfx';
 import { hashPin, verifyPin } from '../lib/pin';
+import type { BreezeSettings } from '../lib/breeze-speech';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -23,9 +24,18 @@ export type JarvisPosition = 'center' | 'bottom-left' | 'bottom-right' | 'top-le
 export type RealtimeModel = 'gpt-realtime-2' | 'gpt-realtime-1.5' | 'gpt-realtime-mini';
 export type LocalLlmProvider = 'ollama' | 'olares' | 'olares-shared';
 
-export interface JarvisSettings {
-  apiMode: 'openai' | 'elevenlabs';
+export interface JarvisSettings extends BreezeSettings {
+  apiMode: 'openai' | 'elevenlabs' | 'local' | 'gemini';
   apiKey: string;
+  /** Gemini API key — drives the Gemini Live voice engine and the server-side
+   *  text ladder (Mark 58's fallback ladder). Blank = server brain uses the
+   *  configured local model instead. */
+  geminiApiKey?: string;
+  /** Optional OpenAI-compatible provider tried before/after the Gemini rungs
+   *  (Mark 58's "prov:" rungs). */
+  geminiProviderUrl?: string;
+  geminiProviderKey?: string;
+  geminiProviderFirst?: boolean;
   realtimeModel?: RealtimeModel;
   localLlmUrl?: string;
   localLlmModel?: string;
@@ -237,14 +247,14 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings, dynami
               <div className="space-y-2">
                 <label className="text-xs font-bold text-cyan-500 uppercase tracking-widest">Voice Engine</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['openai', 'elevenlabs'] as const).map((mode) => {
+                  {(['openai', 'elevenlabs', 'gemini', 'local'] as const).map((mode) => {
                     const active = (settings.apiMode ?? 'openai') === mode;
-                    const labels = { openai: 'OpenAI Realtime', elevenlabs: 'ElevenLabs' };
-                    const descs  = { openai: 'GPT Realtime 2 via WebRTC', elevenlabs: 'Jarvis Agent via WebRTC' };
+                    const labels = { openai: 'OpenAI Realtime', elevenlabs: 'ElevenLabs', gemini: 'Gemini Live', local: 'Local voice' };
+                    const descs  = { openai: 'GPT Realtime 2 via WebRTC', elevenlabs: 'Jarvis Agent via WebRTC', gemini: 'Gemini Live voice — the Mark 58 engine', local: 'Whisper + local LLM + Breeze' };
                     return (
                       <button
                         key={mode}
-                        onClick={() => { sfx('select', 0.5); setSettings({ ...settings, apiMode: mode }); }}
+                        onClick={() => { sfx('select', 0.5); setSettings({ ...settings, apiMode: mode, ...(mode === 'local' ? { ttsProvider: 'olares' as const } : {}) }); }}
                         className={`flex flex-col items-start px-3 py-2.5 border rounded text-left transition-all ${
                           active
                             ? 'bg-cyan-500/20 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
@@ -259,6 +269,26 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings, dynami
                     );
                   })}
                 </div>
+              </div>
+
+              <div className="space-y-3 pt-2 border-t border-cyan-500/10">
+                <label className="text-xs font-bold text-cyan-500 uppercase tracking-widest" htmlFor="tts-provider">Speech Output</label>
+                <select id="tts-provider" value={settings.ttsProvider ?? 'native'} onChange={e => setSettings({ ...settings, ttsProvider: e.target.value as 'native' | 'olares' })} className="w-full bg-black border border-cyan-500/30 rounded px-3 py-2 text-cyan-100">
+                  <option value="native">Voice engine default</option>
+                  <option value="olares">Breeze TTS · Olares Router</option>
+                </select>
+                {settings.ttsProvider === 'olares' && <>
+                  <p className="text-xs text-cyan-600">Local voice uses Whisper on this PC, your Local Model Service for replies, and Breeze for speech. Speak, then pause for a reply; the microphone pauses while Jarvis thinks and speaks. App tools and photo input are currently available in the other voice engines.</p>
+                  {([
+                    ['ttsRouterUrl', 'Router Base URL', 'https://router.your-domain.olares.com/v1'],
+                    ['ttsRouterApiKey', 'Router API key', 'Leave blank to reuse your Olares Local Model Service key'],
+                    ['ttsModel', 'Speech model', 'default-tts'],
+                    ['ttsVoice', 'Voice (default: English male)', 'en-m'],
+                  ] as const).map(([key, label, placeholder]) => <label key={key} className="block text-xs text-cyan-600">{label}
+                    <input type={key === 'ttsRouterApiKey' ? 'password' : 'text'} value={settings[key] ?? ''} placeholder={placeholder} onChange={e => setSettings({ ...settings, [key]: e.target.value })} className="mt-1 w-full bg-black/40 border border-cyan-500/30 rounded px-3 py-2 text-cyan-100" />
+                  </label>)}
+                  <p className="text-xs text-cyan-700">Choose Breeze as Router’s default TTS model to use default-tts, or paste its exact model name. Voices include en-m, en-f, zh-m, zh-f, and saved voice IDs. Blank connection fields reuse Olares Local Model Service settings. Test speech in Audio Lab.</p>
+                </>}
               </div>
 
               {/* Wake Word Configuration */}
@@ -311,6 +341,67 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings, dynami
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Gemini Live fields */}
+              {(settings.apiMode ?? 'openai') === 'gemini' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-cyan-500 uppercase tracking-widest">Gemini API Key</label>
+                  <input
+                    type="password"
+                    value={settings.geminiApiKey ?? ''}
+                    onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
+                    placeholder="AIza..."
+                    className="w-full bg-cyan-950/20 border border-cyan-500/30 rounded px-3 py-2 text-cyan-100 focus:outline-none focus:border-cyan-400 focus:shadow-[0_0_10px_rgba(34,211,238,0.3)] transition-all font-mono text-sm"
+                  />
+                  <p className="text-[10px] text-cyan-700 leading-tight">
+                    Streams live voice through Gemini (Mark 58&apos;s voice engine) with all your Jarvis tools.
+                    The same key powers the server-side text ladder for missions and background work.
+                  </p>
+                </div>
+              )}
+
+              {/* Gemini text ladder — server brain (independent of voice mode) */}
+              <div className="space-y-2 pt-2 border-t border-cyan-500/10">
+                <label className="text-xs font-bold text-cyan-500 uppercase tracking-widest">Gemini Text Ladder (server brain)</label>
+                <input
+                  type="password"
+                  value={settings.geminiApiKey ?? ''}
+                  onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
+                  placeholder="Gemini API key (optional — missions then run on the ladder)"
+                  className="w-full bg-cyan-950/20 border border-cyan-500/30 rounded px-3 py-2 text-cyan-100 font-mono text-sm"
+                />
+                <input
+                  type="text"
+                  value={settings.geminiProviderUrl ?? ''}
+                  onChange={(e) => setSettings({ ...settings, geminiProviderUrl: e.target.value })}
+                  placeholder="Optional OpenAI-compatible provider URL (https://…/v1)"
+                  className="w-full bg-cyan-950/20 border border-cyan-500/30 rounded px-3 py-2 text-cyan-100 font-mono text-sm"
+                />
+                <div className="flex items-center gap-3">
+                  <input
+                    type="password"
+                    value={settings.geminiProviderKey ?? ''}
+                    onChange={(e) => setSettings({ ...settings, geminiProviderKey: e.target.value })}
+                    placeholder="Provider API key"
+                    className="flex-1 bg-cyan-950/20 border border-cyan-500/30 rounded px-3 py-2 text-cyan-100 font-mono text-sm"
+                  />
+                  <label className="flex items-center gap-2 text-[10px] text-cyan-600 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={settings.geminiProviderFirst ?? false}
+                      onChange={(e) => setSettings({ ...settings, geminiProviderFirst: e.target.checked })}
+                      className="accent-cyan-500"
+                    />
+                    Provider first
+                  </label>
+                </div>
+                <p className="text-[10px] text-cyan-700 leading-tight">
+                  Missions and background agents call this ladder first (fast lite models, then heavier
+                  ones; a rung out of quota steps aside for a while). Blank key = they run on your local
+                  model below. The provider URL (Mark 58&apos;s "prov:" rungs) rides before or after the
+                  Gemini models per the toggle.
+                </p>
               </div>
 
               {/* OpenAI fields */}
@@ -402,7 +493,7 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings, dynami
               <div className="space-y-3 pt-3 border-t border-cyan-500/20">
                 <div>
                   <label className="text-xs font-bold text-cyan-500 uppercase tracking-widest">Local LLM Chat</label>
-                  <p className="text-[10px] text-cyan-700 mt-1">Connect to Ollama, Olares Router, or an Olares shared model endpoint. Text chat only; the voice engine remains separate.</p>
+                  <p className="text-[10px] text-cyan-700 mt-1">Connect to Ollama, Olares Router, or an Olares shared model endpoint. Used for Local Chat and the Local voice engine.</p>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">Local Model Service</label>

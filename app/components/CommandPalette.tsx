@@ -31,6 +31,17 @@ const PAGES: { page: string; label: string }[] = [
   { page: 'social', label: 'Social Command' },
   { page: 'audio-test', label: 'Audio Lab' },
   { page: 'round-display', label: 'Round Display' },
+  { page: 'bounty-hunter', label: 'Bounty Hunter' },
+  { page: 'wildcard-draw', label: 'Wildcard Draw' },
+  { page: 'gods-eye', label: "God's Eye" },
+  { page: 'disk-map', label: 'Disk Map' },
+  { page: 'build-guide', label: 'Build Guide' },
+  { page: 'missions', label: 'Missions' },
+  { page: 'memory', label: 'Memory' },
+  { page: 'health', label: 'Health' },
+  { page: 'dev-mode', label: 'Developer' },
+  { page: 'market', label: 'Market' },
+  { page: 'network-radar', label: 'Network Radar' },
 ];
 
 const WIDGETS: { widget: string; label: string }[] = [
