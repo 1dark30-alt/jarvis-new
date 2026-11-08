@@ -55,7 +55,7 @@ const DEFAULT_SETTINGS: JarvisSettings = {
     'screen_eyes', 'dev_command', 'health_command',
     'excel_writer', 'document_review', 'obsidian_vault', 'market_analyzer',
     'screen_agent', 'network_radar', 'notifications_command',
-    'finance_command',
+    'finance_command', 'scoresheet_command',
   ],
   wakeWordEnabled: false,
   wakeWordSensitivity: 0.5,

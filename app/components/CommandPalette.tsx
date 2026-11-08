@@ -43,6 +43,7 @@ const PAGES: { page: string; label: string }[] = [
   { page: 'market', label: 'Market' },
   { page: 'network-radar', label: 'Network Radar' },
   { page: 'finance', label: 'Finance' },
+  { page: 'scoresheets', label: 'APA Scoresheets' },
 ];
 
 const WIDGETS: { widget: string; label: string }[] = [

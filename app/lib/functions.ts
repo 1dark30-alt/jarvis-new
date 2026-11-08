@@ -1296,6 +1296,52 @@ export const FUNCTION_REGISTRY: JarvisFunction[] = [
     },
   },
   {
+    name: 'scoresheet_command',
+    label: 'APA Scoresheets',
+    description: 'File, red-line and key the weekly APA scoresheets into the Nexus portal',
+    tool: {
+      type: 'function',
+      name: 'scoresheet_command',
+      description:
+        'Run the user\'s APA league scoresheet toolkit. ' +
+        'op "process": take the weekly combined Digital Scoresheets PDF (full path), split it per team into the league folder, red-line both teams\' copies against the league rules, and attach reconciliation pages. ' +
+        'op "status": report the league folder and how many week folders are filed. ' +
+        'Use when the user mentions scoresheets, the weekly APA PDF, red-lining, or keying matches into Nexus. The Nexus F9 typing helper is started from the Scoresheets page itself.',
+      parameters: {
+        type: 'object',
+        properties: {
+          op: { type: 'string', enum: ['process', 'status'] },
+          pdfPath: { type: 'string', description: 'For process: full path to the combined scoresheets PDF.' },
+        },
+        required: ['op'],
+      },
+    },
+    handler: async (args) => {
+      try {
+        const op = String(args.op ?? 'status');
+        if (op === 'status') {
+          const d = await fetch('/api/apa').then((r) => r.json()) as { configured?: boolean; league?: string; weeks?: unknown[]; message?: string };
+          window.dispatchEvent(new CustomEvent('jarvis:navigate', { detail: { page: 'scoresheets' } }));
+          return {
+            configured: d.configured ?? false,
+            league: d.league ?? undefined,
+            weeksFiled: d.weeks?.length ?? 0,
+          };
+        }
+        const d = await fetch('/api/apa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ op: 'process', pdfPath: args.pdfPath }),
+        }).then((r) => r.json()) as { ok?: boolean; output?: string; error?: string };
+        if (d.error) return { error: d.error };
+        window.dispatchEvent(new CustomEvent('jarvis:navigate', { detail: { page: 'scoresheets' } }));
+        return { done: d.ok ?? false, output: (d.output ?? '').slice(-1200) };
+      } catch (err) {
+        return { error: String(err) };
+      }
+    },
+  },
+  {
     name: 'memory_command',
     label: 'Memory',
     description: 'Remember, recall and forget facts about the user across sessions',
@@ -1997,7 +2043,7 @@ export const FUNCTION_REGISTRY: JarvisFunction[] = [
       type: 'function',
       name: 'navigate_to_page',
       description:
-        'Navigate Jarvis to a different page. Use for "home", "news", "calendar", "home-assistant", "3d-printers", "music", "spiderman", "manufacturing", "webshooter", "social", "audio-test", "round-display", "bounty-hunter", "wildcard-draw", "gods-eye", "disk-map", "build-guide", "missions", "memory", "health", "dev-mode", or "finance". ' +
+        'Navigate Jarvis to a different page. Use for "home", "news", "calendar", "home-assistant", "3d-printers", "music", "spiderman", "manufacturing", "webshooter", "social", "audio-test", "round-display", "bounty-hunter", "wildcard-draw", "gods-eye", "disk-map", "build-guide", "missions", "memory", "health", "dev-mode", "finance", or "scoresheets". ' +
         '"news" opens the live news feed with streaming video and market data. ' +
         '"calendar" opens the calendar and task planner. ' +
         '"home-assistant" opens the smart home control panel for lights, switches, climate, and more. ' +
@@ -2017,6 +2063,7 @@ export const FUNCTION_REGISTRY: JarvisFunction[] = [
         '"memory" opens the Memory panel — every stored fact with when it was learned and one-click delete. Use when the user asks what Jarvis remembers or wants to manage stored facts. ' +
         '"health" opens the Health page — live machine gauges and service checks. ' +
         '"dev-mode" opens the Developer page — engineering jobs with outputs. ' +
+        '"scoresheets" opens the APA Scoresheets toolkit — filing, red-lining and keying the weekly league scoresheets into Nexus. ' +
         '"finance" opens the Finance screen — bank spending, subscriptions and balances (read-only). Use when the user asks about their money. ' +
         '"home" returns to the main Jarvis home screen. ' +
         'NEVER use this for map or location requests — use map_command instead.',
@@ -2025,8 +2072,8 @@ export const FUNCTION_REGISTRY: JarvisFunction[] = [
         properties: {
           page: {
             type: 'string',
-            enum: ['home', 'news', 'calendar', 'home-assistant', '3d-printers', 'music', 'spiderman', 'manufacturing', 'webshooter', 'social', 'audio-test', 'round-display', 'bounty-hunter', 'wildcard-draw', 'gods-eye', 'disk-map', 'build-guide', 'missions', 'memory', 'health', 'dev-mode', 'finance'],
-            description: '"home" = main Jarvis view. "news" = live news + stocks feed. "calendar" = calendar and daily task planner. "home-assistant" = smart home control panel. "3d-printers" = Bambu Lab 3D printer dashboard. "music" = full-screen music player. "spiderman" = Spider-Man suit armory with a 3D holographic suit carousel. "manufacturing" = fabrication bay for building 3D components on printers/lasers/CNC. "webshooter" = web-shooter designer lab for building taser web / web fluid / web grenade / acid web cartridges. "social" = Social Command dashboard with Instagram/TikTok/Facebook/YouTube browsers and AI comment replies. "audio-test" = Audio Lab for typing speech scripts, previewing, and saving MP3s via OpenAI or ElevenLabs. "round-display" = full-screen circular visualizer for round displays. "bounty-hunter" = local league dashboard for rosters, bounties, standings and posters. "wildcard-draw" = offline wildcard team draw board. "gods-eye" = satellite intelligence console with live aircraft, ships, satellites and earthquakes. "disk-map" = live treemap of disk usage. "build-guide" = wiring-diagram page (open it with the build_guide tool). "missions" = board of background missions and their reports. "memory" = panel of everything Jarvis remembers about the user. "health" = live system health gauges. "dev-mode" = engineering job runner. "finance" = bank spending/subscriptions screen.',
+            enum: ['home', 'news', 'calendar', 'home-assistant', '3d-printers', 'music', 'spiderman', 'manufacturing', 'webshooter', 'social', 'audio-test', 'round-display', 'bounty-hunter', 'wildcard-draw', 'gods-eye', 'disk-map', 'build-guide', 'missions', 'memory', 'health', 'dev-mode', 'finance', 'scoresheets'],
+            description: '"home" = main Jarvis view. "news" = live news + stocks feed. "calendar" = calendar and daily task planner. "home-assistant" = smart home control panel. "3d-printers" = Bambu Lab 3D printer dashboard. "music" = full-screen music player. "spiderman" = Spider-Man suit armory with a 3D holographic suit carousel. "manufacturing" = fabrication bay for building 3D components on printers/lasers/CNC. "webshooter" = web-shooter designer lab for building taser web / web fluid / web grenade / acid web cartridges. "social" = Social Command dashboard with Instagram/TikTok/Facebook/YouTube browsers and AI comment replies. "audio-test" = Audio Lab for typing speech scripts, previewing, and saving MP3s via OpenAI or ElevenLabs. "round-display" = full-screen circular visualizer for round displays. "bounty-hunter" = local league dashboard for rosters, bounties, standings and posters. "wildcard-draw" = offline wildcard team draw board. "gods-eye" = satellite intelligence console with live aircraft, ships, satellites and earthquakes. "disk-map" = live treemap of disk usage. "build-guide" = wiring-diagram page (open it with the build_guide tool). "missions" = board of background missions and their reports. "memory" = panel of everything Jarvis remembers about the user. "health" = live system health gauges. "dev-mode" = engineering job runner. "finance" = bank spending/subscriptions screen. "scoresheets" = APA league scoresheet toolkit.',
           },
         },
         required: ['page'],

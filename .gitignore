@@ -16,3 +16,4 @@ network-devices.json
 # Local runtime state (per-machine memory, contains private data)
 jarvis-memory.json
 plaid.json
+apa-nexus-state.json
