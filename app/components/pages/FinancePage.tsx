@@ -54,6 +54,7 @@ export function FinancePage({ onNavigateHome }: { onNavigateHome: () => void }) 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [connectLabel, setConnectLabel] = useState<'business' | 'personal'>('personal');
+  const [showSetupBanner, setShowSetupBanner] = useState(false);
   const linkHandlerRef = useRef<{ open: () => void } | null>(null);
 
   const loadConnections = useCallback(async () => {
@@ -109,7 +110,11 @@ export function FinancePage({ onNavigateHome }: { onNavigateHome: () => void }) 
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ op: 'link_token' }),
       }).then((r) => r.json()) as { linkToken?: string; error?: string };
-      if (d.error || !d.linkToken) { setError(d.error ?? 'Could not create a Link token.'); setBusy(null); return; }
+      if (d.error || !d.linkToken) {
+        setError(d.error ?? 'Could not create a Link token.');
+        if ((d.error ?? '').includes('Plaid is not configured')) setShowSetupBanner(true);
+        setBusy(null); return;
+      }
 
       await new Promise<void>((resolve, reject) => {
         const existing = document.getElementById('plaid-link-script');
@@ -215,6 +220,23 @@ export function FinancePage({ onNavigateHome }: { onNavigateHome: () => void }) 
       </div>
 
       {error && <p className="px-6 pt-2 text-[11px] text-red-300 font-mono">{error}</p>}
+      {showSetupBanner && (
+        <div className="mx-6 mt-2 rounded-lg p-4 flex items-center justify-between gap-4" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.35)' }}>
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-amber-300 mb-1">Plaid credentials missing</div>
+            <p className="text-xs text-white/60">
+              Get your <span className="font-mono">client_id</span> and <span className="font-mono">secret</span> from dashboard.plaid.com → Team Settings → API keys,
+              then paste them into Settings → the Plaid section.
+            </p>
+          </div>
+          <button
+            onClick={() => { setShowSetupBanner(false); window.dispatchEvent(new CustomEvent('jarvis:open-settings')); }}
+            className="px-3 py-2 rounded font-mono text-[10px] uppercase tracking-widest bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 shrink-0"
+          >
+            Open Settings
+          </button>
+        </div>
+      )}
       {busy === 'data' && <p className="px-6 pt-2 text-[11px] text-cyan-400/70 font-mono animate-pulse">Pulling bank data…</p>}
 
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
