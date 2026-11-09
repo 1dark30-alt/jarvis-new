@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
+import { pythonExe } from '@/app/lib/server/python-exe';
 import screenshot from 'screenshot-desktop';
 import sharp from 'sharp';
 import { callGemini, SMART } from '../../lib/server/geminiLadder';
@@ -34,12 +35,10 @@ interface AgentAction {
   summary?: string;
 }
 
-function pyExe(): string { return process.env.JARVIS_PYTHON || 'python'; }
-
 function runAction(spec: AgentAction): Promise<{ ok: boolean; screen?: number[]; error?: string }> {
   const script = path.join(process.cwd(), 'scripts', 'agent_action.py');
   return new Promise((resolve) => {
-    execFile(pyExe(), [script, JSON.stringify(spec)], {
+    execFile(pythonExe(), [script, JSON.stringify(spec)], {
       timeout: 30_000,
       windowsHide: false,
       encoding: 'utf8',

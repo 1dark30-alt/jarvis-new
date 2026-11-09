@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { PageHeader } from '../PageHeader';
+import { SplitView } from '../scoresheets/SplitView';
 
 /**
  * APA Scoresheets — the league operator's toolkit as a Jarvis screen.
@@ -34,6 +35,8 @@ interface NexusState {
 export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void }) {
   const [league, setLeague] = useState('');
   const [leagueInput, setLeagueInput] = useState('');
+  const [dropFolder, setDropFolder] = useState('');
+  const [dropInput, setDropInput] = useState('');
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [weeks, setWeeks] = useState<WeekFolder[]>([]);
   const [pdfPath, setPdfPath] = useState('');
@@ -53,15 +56,28 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [error, setError] = useState('');
   const helperRunningRef = useRef(false);
+  // Split view: Nexus browser on one side, scoresheet PDF on the other.
+  const [splitOn, setSplitOn] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('jarvis_apa_split') === '1';
+  });
+  const toggleSplit = () => {
+    setSplitOn((v) => {
+      try { localStorage.setItem('jarvis_apa_split', v ? '0' : '1'); } catch { /* ignore */ }
+      return !v;
+    });
+  };
 
   const loadConfig = useCallback(async () => {
     const d = await fetch('/api/apa').then((r) => r.json()) as {
-      configured?: boolean; league?: string; weeks?: WeekFolder[]; message?: string;
+      configured?: boolean; league?: string; dropFolder?: string; weeks?: WeekFolder[]; message?: string;
       legacyDivisions?: string[]; seasons?: string[];
     };
     setConfigured(Boolean(d.configured));
     setLeague(d.league ?? '');
     setLeagueInput(d.league ?? '');
+    setDropFolder(d.dropFolder ?? '');
+    if (!d.dropFolder) setDropInput(''); else setDropInput(d.dropFolder);
     setWeeks(d.weeks ?? []);
     setLegacyDivisions(d.legacyDivisions ?? []);
     if (!d.configured && d.message) setError(d.message);
@@ -93,6 +109,18 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
     setLeague(d.league ?? '');
     setWeeks(d.weeks ?? []);
     setConfigured(true);
+  };
+
+  const saveDropFolder = async () => {
+    setError('');
+    const d = await fetch('/api/apa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'set_drop_folder', dropFolder: dropInput }),
+    }).then((r) => r.json()) as { ok?: boolean; dropFolder?: string; pdfs?: { name: string; path: string; mtime: number }[]; error?: string };
+    if (d.error) { setError(d.error); return; }
+    setDropFolder(d.dropFolder ?? '');
+    setPdfList(d.pdfs ?? []);
+    if (!selectedPdf && (d.pdfs ?? []).length) setSelectedPdf(d.pdfs![0].path);
   };
 
   const process = async () => {
@@ -167,9 +195,27 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
         title="APA Scoresheets"
         onNavigateHome={onNavigateHome}
         accent="cyan"
-        right={<span className="font-mono text-[9px] uppercase tracking-widest text-white/30 max-w-[280px] truncate">{league || 'no league folder'}</span>}
+        right={
+          <>
+            <button
+              onClick={toggleSplit}
+              className={`flex items-center gap-1.5 px-3 h-7 rounded-lg border text-[9px] font-mono uppercase tracking-wider transition-all shrink-0
+                ${splitOn
+                  ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25'
+                  : 'bg-white/[0.04] border-white/[0.08] text-white/40 hover:text-white/70 hover:border-white/20'}`}
+              title="Toggle split view: Nexus browser + scoresheet PDF"
+            >
+              <div className={`w-1 h-1 rounded-full ${splitOn ? 'bg-cyan-300' : 'bg-white/25'}`} />
+              {splitOn ? 'Setup' : 'Split view'}
+            </button>
+            <span className="font-mono text-[9px] uppercase tracking-widest text-white/30 max-w-[280px] truncate">{league || 'no league folder'}</span>
+          </>
+        }
       />
 
+      {splitOn ? (
+        <SplitView pdfList={pdfList} initialPdf={selectedPdf || pdfPath} nexus={nexus} />
+      ) : (
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
         {error && <p className="text-[11px] text-red-300 font-mono">{error}</p>}
 
@@ -211,6 +257,23 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
         {/* process PDF */}
         <div className="rounded-lg p-4 space-y-2" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(34,211,238,0.12)' }}>
           <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-cyan-400/70">1 · Pick &amp; process the weekly scoresheets PDF</div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-white/30">Drop</span>
+            <input
+              value={dropInput}
+              onChange={(e) => setDropInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void saveDropFolder(); }}
+              placeholder="C:\Vaults\Olares\combine score sheet"
+              className="flex-1 bg-black/40 border border-cyan-500/30 rounded px-3 py-2 text-cyan-100 font-mono text-xs"
+            />
+            <button onClick={() => void saveDropFolder()}
+              className="px-3 py-2 rounded font-mono text-[10px] uppercase tracking-widest bg-cyan-500/10 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/20 shrink-0">
+              Save
+            </button>
+          </div>
+          {dropFolder && (
+            <p className="font-mono text-[9px] text-white/25 truncate">PDFs scan: {dropFolder} → Downloads → league folder</p>
+          )}
           <div className="flex items-center gap-2">
             <span className="font-mono text-[9px] uppercase tracking-widest text-white/30">Season</span>
             <input
@@ -326,6 +389,7 @@ export function ScoresheetsPage({ onNavigateHome }: { onNavigateHome: () => void
           </p>
         </div>
       </div>
+      )}
     </motion.div>
   );
 }

@@ -3,6 +3,7 @@ import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pythonExe } from '@/app/lib/server/python-exe';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,6 @@ export const dynamic = 'force-dynamic';
  * The league folder is a per-user setting (apa_league_folder).
  */
 
-const PY_EXE = process.env.JARVIS_PYTHON || 'python';
 
 /** Folders inside the league folder that are NOT season folders. */
 const NON_SEASON_DIRS = new Set([
@@ -47,18 +47,40 @@ function readLeagueFolder(): string {
 }
 
 function writeLeagueFolder(p: string): void {
+  writeSettingsValue('apa_league_folder', p);
+}
+
+/** Per-user drop folder for fresh combined scoresheets PDFs (e.g. a synced
+ * vault folder). Takes precedence over the auto-detected sibling folder. */
+function readDropFolder(): string {
+  try {
+    const raw = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) as Record<string, unknown>;
+    const inner = (typeof raw.jarvis_settings === 'string'
+      ? JSON.parse(raw.jarvis_settings)
+      : raw.jarvis_settings ?? {}) as Record<string, unknown>;
+    return String(inner.apa_drop_folder ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function writeDropFolder(p: string): void {
+  writeSettingsValue('apa_drop_folder', p);
+}
+
+function writeSettingsValue(key: string, value: string): void {
   const raw = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) as Record<string, unknown>;
   const inner = (typeof raw.jarvis_settings === 'string'
     ? JSON.parse(raw.jarvis_settings)
     : raw.jarvis_settings ?? {}) as Record<string, unknown>;
-  inner.apa_league_folder = p;
+  inner[key] = value;
   raw.jarvis_settings = JSON.stringify(inner);
   fs.writeFileSync(settingsFile(), JSON.stringify(raw, null, 2), 'utf8');
 }
 
 function runToolkit(args: string[], timeoutMs = 300_000): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
-    execFile(PY_EXE, [TOOLKIT, ...args], {
+    execFile(pythonExe(), [TOOLKIT, ...args], {
       timeout: timeoutMs,
       windowsHide: true,
       maxBuffer: 4_000_000,
@@ -72,12 +94,15 @@ function runToolkit(args: string[], timeoutMs = 300_000): Promise<{ code: number
   });
 }
 
-/** Candidate PDFs to process: Downloads + league folder root. */
-function listPdfCandidates(league: string): { name: string; path: string; mtime: number }[] {
+/** Candidate PDFs to process: drop folder + Downloads + league folder root. */
+function listPdfCandidates(league: string, drop = ''): { name: string; path: string; mtime: number }[] {
   const folders = [
-    // The user's drop folder for fresh combined scoresheets (inside the
-    // synced vault), Downloads, and the league folder root.
+    // The configured drop folder for fresh combined scoresheets (e.g. a
+    // synced vault folder) takes precedence…
+    drop,
+    // …then the auto-detected sibling folder next to the league folder…
     path.dirname(league) ? path.join(path.dirname(league), 'combine scoresheets') : '',
+    // …then Downloads and the league folder root.
     path.join(os.homedir(), 'Downloads'),
     ...(league && fs.existsSync(league) ? [league] : []),
   ].filter(Boolean);
@@ -132,16 +157,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const dropFolder = readDropFolder();
+
   if (!league || !fs.existsSync(league)) {
-    return NextResponse.json({ configured: false, league: league || null, message: league ? 'League folder no longer exists — set it again.' : 'No league folder configured.' });
+    return NextResponse.json({ configured: false, league: league || null, dropFolder, message: league ? 'League folder no longer exists — set it again.' : 'No league folder configured.' });
   }
 
   if (op === 'weeks') {
-    return NextResponse.json({ configured: true, league, weeks: weekFolders(league) });
+    return NextResponse.json({ configured: true, league, dropFolder, weeks: weekFolders(league) });
   }
 
   if (op === 'list_pdfs') {
-    return NextResponse.json({ ok: true, league, pdfs: listPdfCandidates(league) });
+    return NextResponse.json({ ok: true, league, dropFolder, pdfs: listPdfCandidates(league, dropFolder) });
   }
 
   // Default: everything the page needs on load — weeks AND the legacy-layout
@@ -161,6 +188,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     configured: true,
     league,
+    dropFolder,
     weeks: weekFolders(league),
     seasons,
     legacyDivisions,
@@ -180,6 +208,16 @@ export async function POST(req: NextRequest) {
         }
         writeLeagueFolder(p);
         return NextResponse.json({ ok: true, league: p, weeks: weekFolders(p) });
+      }
+
+      case 'set_drop_folder': {
+        const p = path.resolve(String(a.dropFolder ?? '').trim());
+        if (!fs.existsSync(p) || !fs.statSync(p).isDirectory()) {
+          return NextResponse.json({ error: `No such folder: ${p}` }, { status: 400 });
+        }
+        writeDropFolder(p);
+        const leagueNow = readLeagueFolder();
+        return NextResponse.json({ ok: true, dropFolder: p, pdfs: listPdfCandidates(leagueNow, p) });
       }
 
       case 'process': {
@@ -228,7 +266,7 @@ export async function POST(req: NextRequest) {
         const weekName = String(a.weekFolder ?? '');
         if (!weekName) return NextResponse.json({ error: 'Pick a week first.' }, { status: 400 });
         const matches = await new Promise<{ matches?: { index: number; teams: string; matchCount: number }[]; error?: string }>((resolve) => {
-          execFile(PY_EXE, [HELPER, '--list', league, weekName], {
+          execFile(pythonExe(), [HELPER, '--list', league, weekName], {
             timeout: 120_000,
             windowsHide: true,
             maxBuffer: 2_000_000,
@@ -256,7 +294,7 @@ export async function POST(req: NextRequest) {
             "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match 'apa_nexus_helper' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"],
             { timeout: 10_000, windowsHide: true }, () => resolve());
         });
-        const child = spawn(PY_EXE, [HELPER, league, weekName, String(matchIndex)], {
+        const child = spawn(pythonExe(), [HELPER, league, weekName, String(matchIndex)], {
           detached: true,
           stdio: 'ignore',
           windowsHide: false,

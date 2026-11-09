@@ -17,3 +17,6 @@ network-devices.json
 jarvis-memory.json
 plaid.json
 apa-nexus-state.json
+
+# Python bytecode caches (machine-local, version-specific)
+__pycache__/

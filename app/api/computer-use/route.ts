@@ -3,6 +3,7 @@ import { spawn, execFileSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { pythonCandidatesWin } from '@/app/lib/server/python-exe';
 
 // In production (packaged .app), process.cwd() is the standalone dir which
 // contains scripts/dist/computer_use (the PyInstaller binary).
@@ -49,16 +50,10 @@ const PYTHON_CANDIDATES_UNIX = [
   'python3',
 ];
 
-const PYTHON_CANDIDATES_WIN = [
-  path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python313', 'python.exe'),
-  path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python312', 'python.exe'),
-  path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python311', 'python.exe'),
-  path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python310', 'python.exe'),
-  path.join(os.homedir(), 'anaconda3', 'python.exe'),
-  path.join(os.homedir(), 'miniconda3', 'python.exe'),
-  path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Python', 'Python312', 'python.exe'),
-  path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Python', 'Python311', 'python.exe'),
-];
+// Concrete python.exe/py.exe locations discovered at runtime (newest
+// version first) — a hardcoded minor-version list goes stale the moment a
+// new Python release is installed.
+const PYTHON_CANDIDATES_WIN = pythonCandidatesWin();
 
 let cachedScriptRunner: { cmd: string; args: string[] } | null = null;
 

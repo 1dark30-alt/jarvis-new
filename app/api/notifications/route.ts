@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
+import { pythonExe } from '@/app/lib/server/python-exe';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const TIMEOUT_MS = 20_000;
-
-function pythonExe(): string {
-  return process.env.JARVIS_PYTHON || 'python';
-}
 
 function readHistory(limit: number): Promise<{ notifications?: { app: string; time: string | null; title: string; body: string }[]; error?: string }> {
   const script = path.join(process.cwd(), 'scripts', 'notifications_history.py');
