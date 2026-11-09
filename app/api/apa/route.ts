@@ -249,6 +249,13 @@ export async function POST(req: NextRequest) {
         if (!league) return NextResponse.json({ error: 'Set the league folder first.' }, { status: 400 });
         const weekName = String(a.weekFolder ?? '');
         const matchIndex = Number(a.matchIndex ?? 0);
+        // Kill any stale helper instances first — each one holds a global
+        // hotkey, and six zombies exhaust every key on the ladder.
+        await new Promise<void>((resolve) => {
+          execFile('powershell.exe', ['-NoProfile', '-Command',
+            "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match 'apa_nexus_helper' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"],
+            { timeout: 10_000, windowsHide: true }, () => resolve());
+        });
         const child = spawn(PY_EXE, [HELPER, league, weekName, String(matchIndex)], {
           detached: true,
           stdio: 'ignore',
@@ -275,15 +282,20 @@ export async function POST(req: NextRequest) {
       }
 
       case 'nexus_stop': {
-        // The helper quits on Ctrl+F12; from the page we just mark the state.
+        // Actually kill the helper — marking the state is not enough, the
+        // process holds a global hotkey until it exits.
+        await new Promise<void>((resolve) => {
+          execFile('powershell.exe', ['-NoProfile', '-Command',
+            "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match 'apa_nexus_helper' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"],
+            { timeout: 10_000, windowsHide: true }, () => resolve());
+        });
         const base = process.env.JARVIS_DATA_DIR || process.cwd();
         try {
           const st = JSON.parse(fs.readFileSync(path.join(base, 'apa-nexus-state.json'), 'utf8'));
           st.running = false;
-          st.message = 'Stopped from the page (the helper exits on its next hotkey press).';
+          st.message = 'Helper stopped.';
           fs.writeFileSync(path.join(base, 'apa-nexus-state.json'), JSON.stringify(st, null, 1));
         } catch { /* no state yet */ }
-        execFile('taskkill', ['/F', '/IM', 'python.exe', '/FI', `WINDOWTITLE eq apa-nexus*`], { windowsHide: true }, () => {});
         return NextResponse.json({ ok: true });
       }
 

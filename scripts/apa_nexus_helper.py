@@ -26,6 +26,27 @@ sys.path.insert(0, str(TOOLKIT_DIR))
 
 import apa_toolkit as tk  # noqa: E402
 
+# Hotkey ladder — much longer than the toolkit's, because zombie helper
+# instances (started and never closed) hold keys until killed. Each entry:
+# (modifiers, virtual key, label). Skip is fixed at Ctrl+F9 and quit at
+# Ctrl+F12, so those two are kept OUT of this list.
+HOTKEY_CANDIDATES = [
+    (0x0000, 0x78, "F9"),
+    (0x0002 | 0x0004, 0x78, "Ctrl+Shift+F9"),
+    (0x0000, 0x77, "F8"),
+    (0x0004, 0x78, "Shift+F9"),
+    (0x0001, 0x78, "Alt+F9"),
+    (0x0001 | 0x0002, 0x78, "Ctrl+Alt+F9"),
+    (0x0002 | 0x0004, 0x77, "Ctrl+Shift+F8"),
+    (0x0004, 0x77, "Shift+F8"),
+    (0x0001, 0x77, "Alt+F8"),
+    (0x0001 | 0x0002, 0x77, "Ctrl+Alt+F8"),
+    (0x0001 | 0x0002, 0x4E, "Ctrl+Alt+N"),
+    (0x0001 | 0x0002, 0x42, "Ctrl+Alt+B"),
+    (0x0001 | 0x0002, 0x4B, "Ctrl+Alt+K"),
+    (0x0000, 0x13, "Pause"),
+]
+
 if sys.platform != "win32" or not tk.KEYS_AVAILABLE:
     print(json.dumps({"error": "Nexus typing is Windows-only (SendInput)."}))
     sys.exit(1)
@@ -118,16 +139,18 @@ def main():
     WM_HOTKEY = 0x0312
 
     chosen = None
-    for i, (mods, vk, _label) in enumerate(tk.HOTKEY_CANDIDATES, start=1):
+    for i, (mods, vk, label) in enumerate(HOTKEY_CANDIDATES, start=1):
         if _user32.RegisterHotKey(None, i, mods, vk):
             chosen = (i, mods, vk)
             break
     if chosen is None:
         state["running"] = False
-        state["message"] = "No hotkey was available on this PC."
+        state["message"] = "No hotkey was available — another app (or a stale helper) holds every key. Close other helpers and retry."
         write_state(state)
         print(json.dumps({"error": "no hotkey available"}))
         sys.exit(1)
+    state["message"] = f"Click into the Player # box in Nexus, then press {label}. Ctrl+F9 skips, Ctrl+F12 quits."
+    write_state(state)
 
     # quit hotkey: Ctrl+F12
     quit_registered = _user32.RegisterHotKey(None, 98, 0x0002 | 0x0008, 0x7B)
