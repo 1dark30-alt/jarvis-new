@@ -674,44 +674,27 @@ $('standingsFile').addEventListener('change', async function(){
   if(!f) return;
   $('err').textContent = 'Reading standings…';
   try{
-    var pdfjs = await import('/apps/wildcard-draw/vendor/pdf.mjs');
-    pdfjs.GlobalWorkerOptions.workerSrc = '/apps/wildcard-draw/vendor/pdf.worker.mjs';
+    // Extraction runs server-side via pdfplumber — it keeps the visual
+    // reading order of the columnar standings, which raw pdf.js text does not.
     var buf = await f.arrayBuffer();
-    var doc = await pdfjs.getDocument({ data: buf }).promise;
-    // Each standings PAGE is one division: header + ranked team rows.
-    // Columnar PDFs need Y-grouped, X-sorted row reconstruction — document
-    // order alone scrambles the columns.
+    var res = await fetch('/api/pdf-text', { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: buf });
+    var d = await res.json();
+    if (d.error || !d.text) { $('err').textContent = d.error ?? 'Extraction returned nothing.'; return; }
+    var text = d.text;
     var rawOut = [];
-    for(var p = 1; p <= doc.numPages; p++){
-      var page = await doc.getPage(p);
-      var c = await page.getTextContent();
-      var groups = {};
-      for(var i = 0; i < c.items.length; i++){
-        var it = c.items[i];
-        if(!it.str || !it.str.trim()) continue;
-        var yk = Math.round(it.transform[5] / 2) * 2;
-        if(!groups[yk]) groups[yk] = [];
-        groups[yk].push({ x: it.transform[4], s: it.str });
-      }
-      var ys = Object.keys(groups).map(Number).sort(function(a, b){ return b - a; });
-      var rows = [];
-      for(var g = 0; g < ys.length; g++){
-        var row = groups[ys[g]].sort(function(a, b){ return a.x - b.x; })
-          .map(function(o){ return o.s; }).join(' ').replace(/\s+/g, ' ').trim();
-        if(row) rows.push(row);
-      }
-      var header = null, teamRows = [];
-      for(var r = 0; r < rows.length; r++){
-        var L = rows[r];
-        var div = /^Division\s+(\S+)\s+-\s+(.+)$/i.exec(L);
-        if(div){ header = '# ' + div[1] + ' ' + div[2].trim(); continue; }
-        if(/^Division Standings|^Session|^Standing|^Printed|^Week \d+$|^Fall|^Spring|^Summer|^Winter$|^Qualified$|^Team|^Won/i.test(L)) continue;
-        if(/^\d{1,2}$/.test(L)) continue; // stray qualified-flag fragments
-        var row = /^(\d{1,2})\s+(\d{1,4})\s+(\S+)\s+-\s+(.+)$/.exec(L);
-        if(row) teamRows.push(row[4].trim() + ' ' + row[2]);
-      }
-      if(header && teamRows.length){ rawOut.push(header); rawOut.push.apply(rawOut, teamRows); }
+    var cur = null;
+    var linesArr = text.split(/\r?\n/);
+    for(var li = 0; li < linesArr.length; li++){
+      var L = linesArr[li].replace(/\s+/g, ' ').trim();
+      if(!L) continue;
+      var div = /^Division\s+(\S+)\s+-\s+(.+)$/i.exec(L);
+      if(div){ if(cur) rawOut.push(cur); cur = '# ' + div[1] + ' ' + div[2].trim(); continue; }
+      if(/^Division Standings|^Session|^Standing|^Printed|^Week \d+$|^Fall|^Spring|^Summer|^Winter$|^Qualified$|^Team|^Won/i.test(L)) continue;
+      if(/^\d{1,2}$/.test(L)) continue; // stray qualified-flag fragments
+      var row = /^(\d{1,2})\s+(\d{1,4})\s+(\S+)\s+-\s+(.+)$/.exec(L);
+      if(row) rawOut.push(row[4].trim() + ' ' + row[2]);
     }
+    if(cur) rawOut.push(cur);
     var converted = rawOut.join('\n');
     var divCount = (converted.match(/^# /gm) || []).length;
     if(!divCount){ $('err').textContent = 'Could not find Division Standings tables in that PDF.'; return; }

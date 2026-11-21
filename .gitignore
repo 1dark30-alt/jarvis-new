@@ -20,3 +20,5 @@ apa-nexus-state.json
 
 # Python bytecode caches (machine-local, version-specific)
 __pycache__/
+__pycache__/
+*.pyc
