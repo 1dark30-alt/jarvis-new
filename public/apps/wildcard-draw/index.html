@@ -738,11 +738,17 @@ $('bRec').onclick = async function(){
     recState.recorder.stop();
     return;
   }
-  try{
-    var stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: 30 }, audio: true, preferCurrentTab: true
-    });
-    var mime = pickMime() || 'video/webm';
+  var lastErr = null;
+  for(var attempt = 0; attempt < 2 && !recState.recorder; attempt++){
+    try{
+      // Attempt 0 asks for system loopback audio too (drumroll + spins end up
+      // in the video); if that is rejected, attempt 1 is video-only.
+      var stream = await navigator.mediaDevices.getDisplayMedia(attempt === 0 ? {
+        video: { frameRate: 30 }, audio: true, preferCurrentTab: true
+      } : {
+        video: { frameRate: 30 }, preferCurrentTab: true
+      });
+      var mime = pickMime() || 'video/webm';
     var rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12000000 });
     recState.chunks = [];
     rec.ondataavailable = function(e){ if(e.data && e.data.size) recState.chunks.push(e.data); };
@@ -765,8 +771,24 @@ $('bRec').onclick = async function(){
     recState.recorder = rec;
     this.innerHTML = '&#9209; Stop &amp; save';
     this.style.color = '#7c4dff';
-  }catch(e){
-    /* user cancelled the picker — not an error */
+    lastErr = null;
+    }catch(e){
+      lastErr = e;
+      var m = String((e && e.message) || e);
+      if(m.indexOf('Permission denied') !== -1 || m.indexOf('NotAllowed') !== -1 || m.toLowerCase().indexOf('denied') !== -1){
+        this.innerHTML = '⚠ Capture blocked — refresh (F5) and retry';
+        this.style.color = '#e63946';
+        return;
+      }
+      // keep looping for the audio-less retry
+    }
+  }
+  if(!recState.recorder && lastErr){
+    var m2 = String((lastErr && lastErr.message) || lastErr);
+    if(/dismiss|cancell?ed|canceled/i.test(m2)){ this.innerHTML = '⏺ Record'; return; }
+    this.innerHTML = '⚠ ' + m2.slice(0, 44);
+    this.style.color = '#e63946';
+    console.error('getDisplayMedia failed:', lastErr);
   }
 }.bind($('bRec'));
 
