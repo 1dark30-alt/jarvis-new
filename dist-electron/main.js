@@ -659,12 +659,13 @@ function setupPermissions() {
         return false;
     });
     electron_1.session.defaultSession.setDisplayMediaRequestHandler((options, callback) => {
-        electron_1.desktopCapturer.getSources({ types: ["screen"] }, (error, sources) => {
+        electron_1.desktopCapturer.getSources({ types: ["window", "screen"] }, (error, sources) => {
             if (error || !sources || !sources.length) {
                 callback(null);
                 return;
             }
-            callback({ video: sources[0], audio: "loopback" });
+            const jarvis = sources.find((s) => /jarvis/i.test(s.name));
+            callback({ video: jarvis || sources[0], audio: "loopback" });
         });
     });
 }

@@ -743,7 +743,7 @@ $('bRec').onclick = async function(){
       video: { frameRate: 30 }, audio: true, preferCurrentTab: true
     });
     var mime = pickMime() || 'video/webm';
-    var rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6000000 });
+    var rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12000000 });
     recState.chunks = [];
     rec.ondataavailable = function(e){ if(e.data && e.data.size) recState.chunks.push(e.data); };
     rec.onstop = function(){
@@ -760,6 +760,7 @@ $('bRec').onclick = async function(){
       $('bRec').style.color = '#e63946';
     };
     stream.getVideoTracks()[0].addEventListener('ended', function(){ if(recState.recorder && recState.recorder.state !== 'inactive') rec.stop(); });
+    rec.onerror = function(e){ console.error('Recorder error:', e && e.error ? e.error : e); };
     rec.start(250);
     recState.recorder = rec;
     this.innerHTML = '&#9209; Stop &amp; save';

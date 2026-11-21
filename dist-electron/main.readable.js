@@ -662,12 +662,15 @@ function setupPermissions() {
     // with system loopback audio, so features like the Wildcard Draw recorder
     // capture the spinning process without a picker dialog.
     electron_1.session.defaultSession.setDisplayMediaRequestHandler((options, callback) => {
-        electron_1.desktopCapturer.getSources({ types: ['screen'] }, (error, sources) => {
+        electron_1.desktopCapturer.getSources({ types: ['window', 'screen'] }, (error, sources) => {
             if (error || !sources || !sources.length) {
                 callback(null);
                 return;
             }
-            callback({ video: sources[0], audio: 'loopback' });
+            // Prefer the Jarvis window itself — the recording then captures
+            // exactly the draw process, not the rest of the desktop.
+            const jarvis = sources.find((s) => /jarvis/i.test(s.name));
+            callback({ video: jarvis || sources[0], audio: 'loopback' });
         });
     });
 }
