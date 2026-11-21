@@ -635,6 +635,16 @@ function createWindow() {
         closeDesktopOverlay();
     });
 }
+// Primary screen source cache — module scope so setupPermissions caches it
+// at registration and the display-media handler reuses it per request.
+let cachedScreenSource = null;
+const refreshScreenCache = async () => {
+    try {
+        const sources = await electron_1.desktopCapturer.getSources({ types: ["screen"] });
+        if (sources && sources.length) cachedScreenSource = sources[0];
+    } catch (e) { /* keep the old cache */ }
+};
+
 function setupPermissions() {
     const isJarvisOrigin = (url) => url.startsWith('http://127.0.0.1') ||
         url.startsWith('http://localhost') ||
@@ -658,19 +668,29 @@ function setupPermissions() {
         }
         return false;
     });
-    electron_1.session.defaultSession.setDisplayMediaRequestHandler((options, callback) => {
-        electron_1.desktopCapturer.getSources({ types: ["window", "screen"] }, (error, sources) => {
-            if (error || !sources || !sources.length) {
-                callback(null);
-                return;
-            }
-            callback({ video: sources[0], audio: "loopback" });
-        });
+    electron_1.session.defaultSession.setDisplayMediaRequestHandler(async (options, callback) => {
+        const dmlog = (m) => { try { fetch("http://127.0.0.1:3000/api/log", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tag: "display-media", message: m }) }).catch(() => {}); } catch (e) {} };
+        dmlog("handler invoked — cache present: " + Boolean(cachedScreenSource));
+        if (cachedScreenSource) {
+            callback({ video: cachedScreenSource, audio: "loopback" });
+            return;
+        }
+        await refreshScreenCache();
+        if (cachedScreenSource) {
+            dmlog("callback with freshly fetched screen source");
+            callback({ video: cachedScreenSource, audio: "loopback" });
+            return;
+        }
+        dmlog("no screen source available — callback(null)");
+        callback(null);
     });
 }
 electron_1.app.whenReady().then(async () => {
     // Default BrowserWindow title is "Electron"; menu / Dock name in dev follows the binary unless set here.
     electron_1.app.setName('Jarvis');
+    // Cache the primary screen source OUTSIDE any display-media handler —
+    // calling desktopCapturer.getSources from inside the handler deadlocks.
+    void refreshScreenCache();
     registerJarvisPdfProtocol();
     setupPermissions();
     setupDesktopModeIpc();
