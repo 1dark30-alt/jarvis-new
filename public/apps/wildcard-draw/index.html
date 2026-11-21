@@ -170,6 +170,12 @@
           (byes are excluded automatically).
         </p>
         <textarea id="raw" spellcheck="false"></textarea>
+        <div class="hint" style="margin:6px 0 10px">
+          ✎ This box is editable — <b>adjust the points right here to break a tie</b>:
+          a team's standing place (and eligibility) follows its points, so bumping
+          a number re-sorts the board. Prefix a team with <b>!</b> to exclude it
+          (e.g. playoff-qualified).
+        </div>
         <div class="row">
           <label>Eligible from place</label>
           <input type="number" id="cut" min="2" max="20" value="4">
@@ -688,13 +694,23 @@ $('standingsFile').addEventListener('change', async function(){
       var L = linesArr[li].replace(/\s+/g, ' ').trim();
       if(!L) continue;
       var div = /^Division\s+(\S+)\s+-\s+(.+)$/i.exec(L);
-      if(div){ if(cur) rawOut.push(cur); cur = '# ' + div[1] + ' ' + div[2].trim(); continue; }
-      if(/^Division Standings|^Session|^Standing|^Printed|^Week \d+$|^Fall|^Spring|^Summer|^Winter$|^Qualified$|^Team|^Won/i.test(L)) continue;
+      if(div){ rawOut.push('# ' + div[1] + ' ' + div[2].trim()); continue; }
+      if(/^Division Standings|^Session|^Standing|^Printed|^Week \d+$|^Fall|^Spring|^Summer|^Winter$|^Qualified$|^Team|^Won|^Page \d+/i.test(L)) continue;
       if(/^\d{1,2}$/.test(L)) continue; // stray qualified-flag fragments
       var row = /^(\d{1,2})\s+(\d{1,4})\s+(\S+)\s+-\s+(.+)$/.exec(L);
-      if(row) rawOut.push(row[4].trim() + ' ' + row[2]);
+      if(row){
+        var tail = row[4].trim();
+        var qualified = false;
+        // The Qualified column trails the team name as a bare "1".
+        var qm = /^(.+)\s+1$/.exec(tail);
+        if(qm && qm[1].trim().length > 2){ tail = qm[1].trim(); qualified = true; }
+        rawOut.push((qualified ? '!' : '') + tail + ' ' + row[2]);
+        continue;
+      }
+      if(/^bye\b/i.test(L)){ rawOut.push('Bye'); continue; }
+      // Anything else (season lines, dates, fragments) is skipped — only
+      // structured team rows make it into the draw.
     }
-    if(cur) rawOut.push(cur);
     var converted = rawOut.join('\n');
     var divCount = (converted.match(/^# /gm) || []).length;
     if(!divCount){ $('err').textContent = 'Could not find Division Standings tables in that PDF.'; return; }
