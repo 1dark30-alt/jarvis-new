@@ -664,8 +664,7 @@ function setupPermissions() {
                 callback(null);
                 return;
             }
-            const jarvis = sources.find((s) => /jarvis/i.test(s.name));
-            callback({ video: jarvis || sources[0], audio: "loopback" });
+            callback({ video: sources[0], audio: "loopback" });
         });
     });
 }

@@ -754,6 +754,7 @@ $('bRec').onclick = async function(){
     rec.ondataavailable = function(e){ if(e.data && e.data.size) recState.chunks.push(e.data); };
     rec.onstop = function(){
       stream.getTracks().forEach(function(t){ t.stop(); });
+      if(document.fullscreenElement){ document.exitFullscreen(); }
       var ext = mime.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
       var blob = new Blob(recState.chunks, { type: mime });
       var a = document.createElement('a');
@@ -769,6 +770,9 @@ $('bRec').onclick = async function(){
     rec.onerror = function(e){ console.error('Recorder error:', e && e.error ? e.error : e); };
     rec.start(250);
     recState.recorder = rec;
+    // Go fullscreen for the recording — screen capture then shows ONLY the
+    // draw (spins, confetti, results), which is exactly what Facebook wants.
+    if(!document.fullscreenElement){ $('bFull').click(); }
     this.innerHTML = '&#9209; Stop &amp; save';
     this.style.color = '#7c4dff';
     lastErr = null;

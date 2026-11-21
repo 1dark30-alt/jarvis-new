@@ -658,19 +658,17 @@ function setupPermissions() {
         }
         return false;
     });
-    // Display media (screen recording) — Jarvis pages get the primary screen
-    // with system loopback audio, so features like the Wildcard Draw recorder
-    // capture the spinning process without a picker dialog.
+    // Display media (screen recording) — capture the PRIMARY SCREEN with
+    // system loopback audio. Screen sources never freeze the way window
+    // capture does when a window is occluded; the Wildcard Draw page puts
+    // itself in fullscreen while recording so the video shows only the draw.
     electron_1.session.defaultSession.setDisplayMediaRequestHandler((options, callback) => {
-        electron_1.desktopCapturer.getSources({ types: ['window', 'screen'] }, (error, sources) => {
+        electron_1.desktopCapturer.getSources({ types: ['screen'] }, (error, sources) => {
             if (error || !sources || !sources.length) {
                 callback(null);
                 return;
             }
-            // Prefer the Jarvis window itself — the recording then captures
-            // exactly the draw process, not the rest of the desktop.
-            const jarvis = sources.find((s) => /jarvis/i.test(s.name));
-            callback({ video: jarvis || sources[0], audio: 'loopback' });
+            callback({ video: sources[0], audio: 'loopback' });
         });
     });
 }
