@@ -157,6 +157,7 @@
     <button class="btn ghost" id="bSetup">&#9881; Setup</button>
     <button class="btn ghost" id="bSound">&#128266; Sound On</button>
     <button class="btn ghost" id="bFull">&#9974; Fullscreen</button>
+    <button class="btn ghost" id="bRec" style="color:#e63946">&#11044; Record</button>
   </header>
 
   <section class="screen on" id="setup">
@@ -176,6 +177,7 @@
           <div class="spacer"></div>
           <button class="btn" id="bReset">Reload Summer 2026</button>
           <button class="btn" id="bClear">Clear</button>
+          <label class="btn" id="bImportPdf" style="cursor:pointer">&#128196; Import standings PDF<input type="file" id="standingsFile" accept="application/pdf,.pdf" style="display:none"></label>
         </div>
         <div class="err" id="err"></div>
       </div>
@@ -215,6 +217,8 @@
     <div class="row" style="justify-content:center;margin-top:30px">
       <button class="btn gold" id="bAgain" style="padding:12px 26px">&#8635; Draw Again</button>
       <button class="btn" id="bCopy">Copy Results</button>
+      <button class="btn" id="bImg">&#128247; Results image</button>
+      <button class="btn" id="bVault">&#128190; Save to vault</button>
       <button class="btn ghost" id="bSetup2">&#9881; Back to Setup</button>
     </div>
   </section>
@@ -346,8 +350,10 @@ function parse(){
       continue;
     }
     if(!cur){ cur = { name: 'DIVISION 1', teams: [], winner: null }; out.push(cur); }
-    var forced = false;
+    var forced = false, qualified = false;
     if(L.charAt(0) === '*'){ forced = true; L = L.slice(1).trim(); }
+    // "!Team" = qualified for playoffs — can't take the wildcard, listed but excluded.
+    if(L.charAt(0) === '!'){ qualified = true; forced = true; L = L.slice(1).trim(); }
     L = L.replace(/^\d{1,2}\s*[\.\)\-:]\s*/, '');
     L = L.replace(/[\s\.\-_]*\d{1,4}(\s*(pts?|points))?$/i, '');
     L = L.replace(/\s{2,}/g, ' ').trim();
@@ -356,7 +362,7 @@ function parse(){
     var excluded = forced || isBye;
     var place = cur.teams.length + 1;
     cur.teams.push({
-      name: L, place: place, excluded: excluded, isBye: isBye,
+      name: L, place: place, excluded: excluded, isBye: isBye, qualified: qualified,
       eligible: (!excluded && place >= cut)
     });
   }
@@ -632,6 +638,185 @@ document.addEventListener('keydown', function(e){
   } else if(e.key === 'f' || e.key === 'F'){ $('bFull').click(); }
   else if(e.key === 'm' || e.key === 'M'){ $('bSound').click(); }
 });
+
+/* ---------- standings PDF import ---------- */
+// Converts a Division Standings PDF into the textarea format this tool eats:
+// "# <id> <name>" headers, "<team> <points>" rows, "!Team" for playoff-qualified
+// teams (excluded from the wildcard), "Bye" for byes.
+function standingsToRaw(text){
+  var out = [], cur = null;
+  var lines = text.split(/\r?\n/);
+  for(var i = 0; i < lines.length; i++){
+    var L = lines[i].replace(/\s+/g, ' ').trim();
+    if(!L) continue;
+    var div = /^Division\s+(\S+)\s+-\s+(.+)$/i.exec(L);
+    if(div){
+      if(cur) out.push(cur);
+      cur = '# ' + div[1] + ' ' + div[2].trim();
+      continue;
+    }
+    if(/^Division Standings|^Session|^Standing|^Printed|^Week \d+$|^\(?(\d+ of \d+)\)?$/i.test(L)) continue;
+    var row = /^(\d{1,2})\s+(\d{1,4})\s+(\S+)\s+-\s+(.+)$/.exec(L);
+    if(!row || !cur){ if(cur) out.push(L); continue; }
+    var points = row[2], team = row[4].trim();
+    var qualified = false;
+    var qm = /^(.+)\s+1$/.exec(team);
+    if(qm && qm[1].length > 2){ team = qm[1].trim(); qualified = true; }
+    if(/^bye\b/i.test(team)){ out.push('Bye'); continue; }
+    out.push((qualified ? '!' : '') + team + ' ' + points);
+  }
+  if(cur) out.push(cur);
+  return out.join('\n');
+}
+
+$('standingsFile').addEventListener('change', async function(){
+  var f = this.files && this.files[0];
+  if(!f) return;
+  $('err').textContent = 'Reading standings…';
+  try{
+    var pdfjs = await import('/apps/wildcard-draw/vendor/pdf.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = '/apps/wildcard-draw/vendor/pdf.worker.mjs';
+    var buf = await f.arrayBuffer();
+    var doc = await pdfjs.getDocument({ data: buf }).promise;
+    // Each standings PAGE is one division: header + ranked team rows.
+    // Columnar PDFs need Y-grouped, X-sorted row reconstruction — document
+    // order alone scrambles the columns.
+    var rawOut = [];
+    for(var p = 1; p <= doc.numPages; p++){
+      var page = await doc.getPage(p);
+      var c = await page.getTextContent();
+      var groups = {};
+      for(var i = 0; i < c.items.length; i++){
+        var it = c.items[i];
+        if(!it.str || !it.str.trim()) continue;
+        var yk = Math.round(it.transform[5] / 2) * 2;
+        if(!groups[yk]) groups[yk] = [];
+        groups[yk].push({ x: it.transform[4], s: it.str });
+      }
+      var ys = Object.keys(groups).map(Number).sort(function(a, b){ return b - a; });
+      var rows = [];
+      for(var g = 0; g < ys.length; g++){
+        var row = groups[ys[g]].sort(function(a, b){ return a.x - b.x; })
+          .map(function(o){ return o.s; }).join(' ').replace(/\s+/g, ' ').trim();
+        if(row) rows.push(row);
+      }
+      var header = null, teamRows = [];
+      for(var r = 0; r < rows.length; r++){
+        var L = rows[r];
+        var div = /^Division\s+(\S+)\s+-\s+(.+)$/i.exec(L);
+        if(div){ header = '# ' + div[1] + ' ' + div[2].trim(); continue; }
+        if(/^Division Standings|^Session|^Standing|^Printed|^Week \d+$|^Fall|^Spring|^Summer|^Winter$|^Qualified$|^Team|^Won/i.test(L)) continue;
+        if(/^\d{1,2}$/.test(L)) continue; // stray qualified-flag fragments
+        var row = /^(\d{1,2})\s+(\d{1,4})\s+(\S+)\s+-\s+(.+)$/.exec(L);
+        if(row) teamRows.push(row[4].trim() + ' ' + row[2]);
+      }
+      if(header && teamRows.length){ rawOut.push(header); rawOut.push.apply(rawOut, teamRows); }
+    }
+    var converted = rawOut.join('\n');
+    var divCount = (converted.match(/^# /gm) || []).length;
+    if(!divCount){ $('err').textContent = 'Could not find Division Standings tables in that PDF.'; return; }
+    $('raw').value = converted;
+    save();
+    parse();
+    renderPreview();
+    $('err').textContent = '';
+    $('err').style.color = '';
+  }catch(e){
+    $('err').textContent = 'Import failed: ' + (e && e.message ? e.message : e);
+  }
+  this.value = '';
+});
+
+/* ---------- process recording (for Facebook) ---------- */
+var recState = { recorder: null, stream: null, chunks: [] };
+function pickMime(){
+  var cands = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+  for(var i = 0; i < cands.length; i++) if(MediaRecorder.isTypeSupported(cands[i])) return cands[i];
+  return '';
+}
+$('bRec').onclick = async function(){
+  if(recState.recorder){
+    recState.recorder.stop();
+    return;
+  }
+  try{
+    var stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 30 }, audio: true, preferCurrentTab: true
+    });
+    var mime = pickMime() || 'video/webm';
+    var rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6000000 });
+    recState.chunks = [];
+    rec.ondataavailable = function(e){ if(e.data && e.data.size) recState.chunks.push(e.data); };
+    rec.onstop = function(){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      var ext = mime.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
+      var blob = new Blob(recState.chunks, { type: mime });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'wildcard-draw-' + new Date().toISOString().slice(0, 10) + '.' + ext;
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+      recState.recorder = null;
+      $('bRec').innerHTML = '&#11044; Record';
+      $('bRec').style.color = '#e63946';
+    };
+    stream.getVideoTracks()[0].addEventListener('ended', function(){ if(recState.recorder && recState.recorder.state !== 'inactive') rec.stop(); });
+    rec.start(250);
+    recState.recorder = rec;
+    this.innerHTML = '&#9209; Stop &amp; save';
+    this.style.color = '#7c4dff';
+  }catch(e){
+    /* user cancelled the picker — not an error */
+  }
+}.bind($('bRec'));
+
+/* ---------- results image + vault save (for Facebook) ---------- */
+function resultsImage(){
+  var W = 1080, H = 220 + DIVS.length * 150;
+  var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  var g = cv.getContext('2d');
+  g.fillStyle = '#0a0f14'; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(255,201,60,0.5)'; g.strokeRect(14, 14, W - 28, H - 28);
+  g.fillStyle = '#ffc93c'; g.font = '700 44px Arial'; g.textAlign = 'center';
+  g.fillText('8-BALL WILDCARD DRAW', W / 2, 78);
+  g.fillStyle = 'rgba(255,255,255,0.55)'; g.font = '20px Arial';
+  g.fillText(new Date().toLocaleDateString(), W / 2, 112);
+  var y = 175;
+  for(var i = 0; i < DIVS.length; i++){
+    var d = DIVS[i];
+    g.textAlign = 'left';
+    g.fillStyle = 'rgba(255,255,255,0.6)'; g.font = '600 24px Arial';
+    g.fillText(d.name.toUpperCase(), 60, y);
+    g.fillStyle = '#ffc93c'; g.font = '700 34px Arial';
+    g.fillText((d.winner || '—'), 60, y + 46);
+    g.fillStyle = 'rgba(255,201,60,0.9)';
+    g.fillText('★', W - 90, y + 44);
+    y += 130;
+  }
+  g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,0.35)'; g.font = '16px Arial';
+  g.fillText('Lower Columbia · St Helens 8 — Columbia to Coast APA', W / 2, H - 30);
+  return cv;
+}
+$('bImg').onclick = function(){
+  var cv = resultsImage();
+  cv.toBlob(function(b){
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = 'wildcard-results-' + new Date().toISOString().slice(0, 10) + '.png';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  }, 'image/png');
+};
+$('bVault').onclick = async function(){
+  var lines = ['# Wildcard Draw — ' + new Date().toLocaleDateString(), ''];
+  for(var i = 0; i < DIVS.length; i++) lines.push('- **' + DIVS[i].name + '**: ' + (DIVS[i].winner || '—'));
+  var stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '.');
+  var res = await fetch('/api/obsidian', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ op: 'create', title: 'Wildcard Draw/' + stamp, content: lines.join('\n') }) });
+  var d = await res.json();
+  this.textContent = d.ok ? '✓ Saved' : '✗ Failed';
+  var b = this; setTimeout(function(){ b.textContent = '💾 Save to vault'; }, 3000);
+};
 
 /* ---------- persistence ---------- */
 function save(){

@@ -658,6 +658,15 @@ function setupPermissions() {
         }
         return false;
     });
+    electron_1.session.defaultSession.setDisplayMediaRequestHandler((options, callback) => {
+        electron_1.desktopCapturer.getSources({ types: ["screen"] }, (error, sources) => {
+            if (error || !sources || !sources.length) {
+                callback(null);
+                return;
+            }
+            callback({ video: sources[0], audio: "loopback" });
+        });
+    });
 }
 electron_1.app.whenReady().then(async () => {
     // Default BrowserWindow title is "Electron"; menu / Dock name in dev follows the binary unless set here.
