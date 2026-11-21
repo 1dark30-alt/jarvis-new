@@ -35,7 +35,7 @@ export function WildcardDrawPage({ onNavigateHome }: { onNavigateHome: () => voi
           src="/apps/wildcard-draw/index.html"
           title="Wildcard Draw"
           className="absolute inset-0 w-full h-full border-0 bg-black"
-          allow="clipboard-write; display-capture"
+          allow="clipboard-write; display-capture; fullscreen"
         />
       </div>
     </motion.div>

@@ -738,8 +738,11 @@ $('bRec').onclick = async function(){
     recState.recorder.stop();
     return;
   }
+  var log = function(m){ try { fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tag: 'wildcard-recorder', message: m }) }); } catch(e){} };
+  log('Record clicked — starting capture flow');
   var lastErr = null;
   for(var attempt = 0; attempt < 2 && !recState.recorder; attempt++){
+    log('attempt ' + attempt + ': requesting display media (audio=' + (attempt === 0 ? 'loopback' : 'none') + ')');
     try{
       // Attempt 0 asks for system loopback audio too (drumroll + spins end up
       // in the video); if that is rejected, attempt 1 is video-only.
@@ -753,6 +756,7 @@ $('bRec').onclick = async function(){
     recState.chunks = [];
     rec.ondataavailable = function(e){ if(e.data && e.data.size) recState.chunks.push(e.data); };
     rec.onstop = function(){
+      log('recording STOPPED — chunks: ' + recState.chunks.length + ', total bytes: ' + recState.chunks.reduce(function(a, b){ return a + (b.size || b.byteLength || 0); }, 0));
       stream.getTracks().forEach(function(t){ t.stop(); });
       if(document.fullscreenElement){ document.exitFullscreen(); }
       var ext = mime.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
@@ -766,10 +770,13 @@ $('bRec').onclick = async function(){
       $('bRec').innerHTML = '&#11044; Record';
       $('bRec').style.color = '#e63946';
     };
-    stream.getVideoTracks()[0].addEventListener('ended', function(){ if(recState.recorder && recState.recorder.state !== 'inactive') rec.stop(); });
-    rec.onerror = function(e){ console.error('Recorder error:', e && e.error ? e.error : e); };
+    stream.getVideoTracks()[0].addEventListener('ended', function(){ log('video track ENDED (source gone)'); if(recState.recorder && recState.recorder.state !== 'inactive') rec.stop(); });
+    stream.getVideoTracks()[0].addEventListener('mute', function(){ log('video track MUTED (window occluded/backgrounded)'); });
+    stream.getVideoTracks()[0].addEventListener('unmute', function(){ log('video track UNMUTED'); });
+    rec.onerror = function(e){ log('RECORDER ERROR: ' + String(e && e.error ? e.error : e).slice(0, 200)); };
     rec.start(250);
     recState.recorder = rec;
+    log('recording STARTED — ' + mime + ', fullscreen next');
     // Go fullscreen for the recording — screen capture then shows ONLY the
     // draw (spins, confetti, results), which is exactly what Facebook wants.
     if(!document.fullscreenElement){ $('bFull').click(); }
