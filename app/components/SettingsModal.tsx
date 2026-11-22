@@ -40,6 +40,7 @@ export interface JarvisSettings extends BreezeSettings {
   plaidClientId?: string;
   plaidSecret?: string;
   plaidEnv?: 'sandbox' | 'development' | 'production';
+  plaidRedirectUri?: string;
   realtimeModel?: RealtimeModel;
   localLlmUrl?: string;
   localLlmModel?: string;
@@ -391,7 +392,18 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings, dynami
                   <option value="development">Development (real banks, limited)</option>
                   <option value="production">Production (real banks, full access)</option>
                 </select>
+                <input
+                  type="text"
+                  value={settings.plaidRedirectUri ?? ''}
+                  onChange={(e) => setSettings({ ...settings, plaidRedirectUri: e.target.value })}
+                  placeholder="OAuth redirect URI (default: https://localhost:3543/finance-oauth)"
+                  className="w-full bg-cyan-950/20 border border-cyan-500/30 rounded px-3 py-2 text-cyan-100 font-mono text-sm"
+                />
                 <p className="text-[10px] text-cyan-700 leading-tight">
+                  Outside Sandbox, register the OAuth redirect URI in dashboard.plaid.com →
+                  Team Settings → Allowed redirect URIs (one-time): the default is
+                  <span className="font-mono"> https://localhost:3543/finance-oauth</span> — served locally by Jarvis
+                  with a trusted mkcert certificate (installed automatically).
                   Connect each bank on the Finance screen and label it business or personal.
                   Google Pay purchases show up automatically — they post to the underlying bank card.
                 </p>

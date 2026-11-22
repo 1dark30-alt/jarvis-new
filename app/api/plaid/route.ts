@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { spawn } from 'node:child_process';
+import path from 'node:path';
 import {
   addItem, findItem, listItems, plaidCall, readCreds,
   removeItem, setItemLabel,
@@ -149,18 +151,28 @@ export async function POST(req: NextRequest) {
           country_codes: ['US'],
           language: 'en',
         };
-        // redirect_uri is required for OAuth-based banks (most majors) and must
-        // be whitelisted in the Plaid dashboard. If it isn't whitelisted yet,
-        // fall back to a Link session without it — non-OAuth banks still work.
+        // redirect_uri is REQUIRED for OAuth-based banks (most majors) outside
+        // Sandbox and must be whitelisted in the Plaid dashboard. For non-sandbox
+        // environments the local trusted-HTTPS callback server is spawned on
+        // demand so the URI is live before Link opens.
+        let redirect_uri = creds.redirectUri;
+        if (creds.env !== 'sandbox') {
+          const child = spawn(process.execPath, [path.join(process.cwd(), 'scripts', 'finance-oauth-server.cjs')], {
+            detached: true, stdio: 'ignore', windowsHide: true,
+            env: { ...process.env, JARVIS_DATA_DIR: creds.vaultDir || process.env.JARVIS_DATA_DIR || '' },
+          });
+          child.unref();
+          await new Promise((r) => setTimeout(r, 800));
+        }
         try {
           const data = await plaidCall<{ link_token: string }>('/link/token/create', creds, {
-            ...base, redirect_uri: 'http://127.0.0.1:3000/finance',
+            ...base, redirect_uri,
           });
           return NextResponse.json({ ok: true, linkToken: data.link_token });
         } catch (e) {
           if (!String(e).includes('redirect URI')) throw e;
           const data = await plaidCall<{ link_token: string }>('/link/token/create', creds, base);
-          return NextResponse.json({ ok: true, linkToken: data.link_token, warn: 'connected without OAuth banks — add http://127.0.0.1:3000/finance to the Plaid dashboard redirect URIs to enable them' });
+          return NextResponse.json({ ok: true, linkToken: data.link_token, warn: 'connected without OAuth banks — register ' + redirect_uri + ' in the Plaid dashboard redirect URIs to enable them' });
         }
       }
 

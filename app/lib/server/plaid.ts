@@ -23,6 +23,11 @@ export interface PlaidCreds {
   clientId: string;
   secret: string;
   env: 'sandbox' | 'development' | 'production';
+  /** The registered redirect_uri — required for OAuth banks outside Sandbox.
+   *  Default: the local trusted-HTTPS callback server. */
+  redirectUri: string;
+  /** The Obsidian vault dir (certs + config live here when configured). */
+  vaultDir: string;
 }
 
 interface StoredItem {
@@ -58,9 +63,21 @@ export function readCreds(): PlaidCreds | null {
     const env = (String(s.plaidEnv ?? 'sandbox').trim() || 'sandbox') as PlaidCreds['env'];
     if (!clientId || !secret) return null;
     if (!API_BASE[env]) return null;
-    return { clientId, secret, env };
+    const vault = String(inner_vault(s) ?? '').trim();
+    const redirectUri = String(s.plaidRedirectUri ?? '').trim()
+      || (env === 'sandbox' ? 'http://127.0.0.1:3000/finance' : 'https://localhost:3543/finance-oauth');
+    return { clientId, secret, env, redirectUri, vaultDir: vault };
   } catch {
     return null;
+  }
+}
+
+function inner_vault(raw: Record<string, unknown>): string {
+  try {
+    const inner = (typeof raw.jarvis_settings === 'string' ? JSON.parse(raw.jarvis_settings) : raw.jarvis_settings ?? {}) as Record<string, unknown>;
+    return String(inner.obsidian_vault_path ?? '');
+  } catch {
+    return '';
   }
 }
 
