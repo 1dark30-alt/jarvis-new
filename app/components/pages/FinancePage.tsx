@@ -15,7 +15,7 @@ import { PageHeader } from '../PageHeader';
 
 interface Item { itemId: string; institution: string; label: 'business' | 'personal'; createdAt: string }
 interface Account { itemId: string; institution: string; label: string; accountId: string; name: string; mask: string; type: string; subtype: string; balance: number | null }
-interface Txn { date: string; name: string; amount: number; category: string; label: string; institution: string; pending: boolean }
+interface Txn { date: string; name: string; amount: number; category: string; label: string; institution: string; pending: boolean; internal?: boolean }
 interface Summary {
   ok?: boolean; days?: number;
   totalSpent?: number;
@@ -304,7 +304,7 @@ export function FinancePage({ onNavigateHome }: { onNavigateHome: () => void }) 
             {txns.map((t, i) => (
               <div key={i} className="flex items-center gap-3 py-1.5 border-b border-white/[0.04] text-[12px]">
                 <span className="font-mono text-white/40 w-20 shrink-0">{t.date}</span>
-                <span className="flex-1 min-w-0 truncate text-white/80">{t.name}{t.pending && <span className="text-white/25"> (pending)</span>}</span>
+                <span className="flex-1 min-w-0 truncate text-white/80">{t.name}{t.pending && <span className="text-white/25"> (pending)</span>}{t.internal && <span className="ml-2 font-mono text-[9px] uppercase text-white/30">↔ internal transfer</span>}</span>
                 <span className={`font-mono text-[9px] uppercase w-24 text-right shrink-0 ${t.label === 'business' ? 'text-cyan-400/70' : 'text-emerald-400/70'}`}>{t.label}</span>
                 <span className="font-mono text-white/60 w-24 text-right shrink-0">{money(t.amount)}</span>
               </div>

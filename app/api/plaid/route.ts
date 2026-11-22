@@ -271,13 +271,39 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        const txns: (Txn & { _label: string; _institution: string })[] = enrich(all);
-        const expenses = txns.filter((t) => t.amount > 0);
+        const txns: (Txn & { _label: string; _institution: string; _internal?: boolean })[] = enrich(all);
+
+        // Internal transfer pairs: the same money moving between the user's OWN
+        // connected accounts — matching |amount|, opposite sign, different
+        // accounts, within ±5 days. Excluded from spending so neither side
+        // double-counts (this is what blanked out the business numbers before:
+        // business checking is dominated by Transfer/Withdrawal categories,
+        // which blanket category-filtering erased wholesale).
+        const internal = new Set<number>();
+        const incomes = txns.map((t, i) => ({ t, i })).filter(({ t }) => t.amount < 0);
+        const usedIncome = new Set<number>();
+        for (let i = 0; i < txns.length; i++) {
+          const t = txns[i];
+          if (t.amount <= 0 || internal.has(i)) continue;
+          let best = -1;
+          let bestGap = Infinity;
+          for (const { t: inc, i: ii } of incomes) {
+            if (internal.has(ii) || usedIncome.has(ii)) continue;
+            if (inc.account_id === t.account_id) continue;
+            if (Math.abs(Math.abs(inc.amount) - t.amount) > Math.max(0.05, t.amount * 0.01)) continue;
+            const gap = Math.abs(new Date(inc.date).getTime() - new Date(t.date).getTime()) / 86_400_000;
+            if (gap > 5) continue;
+            if (gap < bestGap) { bestGap = gap; best = ii; }
+          }
+          if (best >= 0) { internal.add(i); internal.add(best); usedIncome.add(best); }
+        }
+        for (const i of internal) txns[i]._internal = true;
+
+        const expenses = txns.filter((t) => t.amount > 0 && !t._internal);
 
         const byCategory = new Map<string, number>();
         for (const t of expenses) {
           const cat = t.category?.length ? t.category[t.category.length - 1] : 'Other';
-          if (SKIP_CATEGORIES.has(t.category?.[0] ?? '')) continue;
           byCategory.set(cat, (byCategory.get(cat) ?? 0) + t.amount);
         }
         const spendingByCategory = [...byCategory.entries()]
@@ -286,18 +312,20 @@ export async function POST(req: NextRequest) {
 
         const split = { business: 0, personal: 0 };
         for (const t of expenses) {
-          if (SKIP_CATEGORIES.has(t.category?.[0] ?? '')) continue;
           split[t._label === 'business' ? 'business' : 'personal'] += t.amount;
         }
+
+        const nonInternal = txns.filter((t) => !t._internal);
 
         if (op === 'summary') {
           return NextResponse.json({
             ok: true,
             days,
-            totalSpent: Math.round(expenses.filter((t) => !SKIP_CATEGORIES.has(t.category?.[0] ?? '')).reduce((s, t) => s + t.amount, 0) * 100) / 100,
+            totalSpent: Math.round(expenses.reduce((s, t) => s + t.amount, 0) * 100) / 100,
+            internalTransfers: internal.size,
             spendingByCategory,
             split: { business: Math.round(split.business * 100) / 100, personal: Math.round(split.personal * 100) / 100 },
-            subscriptions: detectSubscriptions(txns),
+            subscriptions: detectSubscriptions(nonInternal),
             transactionCount: txns.length,
             failed,
           });
@@ -317,6 +345,7 @@ export async function POST(req: NextRequest) {
               label: t._label,
               institution: t._institution,
               pending: Boolean(t.pending),
+              internal: Boolean(t._internal),
             })),
           failed,
         });
