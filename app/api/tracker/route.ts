@@ -47,6 +47,7 @@ function trackerFile(): string {
 }
 
 const TRACKER_SHEETS = ['Summer', 'Fall', 'Spring'];
+const EXTRA_SHEETS = ['Balance Sheet 26.27 LY', 'Budget', 'Singles Boards'];
 const RATE_ROWS = [5, 6, 7, 8];
 const FIRST_WEEK_ROW = 16;
 
@@ -54,6 +55,7 @@ interface TrackerData {
   file: string;
   year: string;
   lo: string;
+  extras: { name: string; rows: string[][] }[];
   sessions: {
     name: string;
     rates: { label: string; players: number | null; basic: number | null }[];
@@ -75,10 +77,23 @@ function asNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** ExcelJS cell → ISO date, handling Dates, shared formulas (result Date),
+ *  rich-text and hyperlink objects. Returns '' when there is no real date. */
+function cellDate(v: unknown): string {
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return v.toISOString().slice(0, 10);
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    const cand = ('result' in o ? o.result : undefined) ?? ('text' in o ? o.text : undefined);
+    if (cand instanceof Date && !Number.isNaN(cand.getTime())) return cand.toISOString().slice(0, 10);
+    if (typeof cand === 'string' && /^\d{4}-\d{2}-\d{2}/.test(cand)) return cand.slice(0, 10);
+  }
+  return '';
+}
+
 async function loadTracker(file: string): Promise<TrackerData> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(file);
-  const data: TrackerData = { file, year: '', lo: '', sessions: [] };
+  const data: TrackerData = { file, year: '', lo: '', extras: [], sessions: [] };
 
   for (const name of TRACKER_SHEETS) {
     const ws = wb.worksheets.find((w) => w.name.trim() === name);
@@ -96,10 +111,11 @@ async function loadTracker(file: string): Promise<TrackerData> {
       }
     }
 
-    for (let r = FIRST_WEEK_ROW; r <= Math.min(ws.rowCount, FIRST_WEEK_ROW + 40); r++) {
+    for (let r = FIRST_WEEK_ROW; r <= Math.min(ws.rowCount, FIRST_WEEK_ROW + 60); r++) {
       const dateCell = ws.getCell(r, 1).value;
-      if (!dateCell) continue;
-      const date = dateCell instanceof Date ? dateCell.toISOString().slice(0, 10) : String(dateCell);
+      const date = cellDate(dateCell);
+      // A week row must carry a real date — TOTAL rows and fragments are skipped.
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
       const teams = [3, 4, 5, 6].map((c) => asNumber(ws.getCell(r, c).value));
       const funds = [7, 8, 9, 10].map((c) => asNumber(ws.getCell(r, c).value));
       const deposit = asNumber(ws.getCell(r, 12).value);
@@ -107,20 +123,44 @@ async function loadTracker(file: string): Promise<TrackerData> {
       session.weeks.push({ row: r, date, invoice: '', teams, funds, total, deposit });
     }
 
-    for (let r = FIRST_WEEK_ROW + 1; r <= Math.min(ws.rowCount, FIRST_WEEK_ROW + 60); r++) {
+    for (let r = FIRST_WEEK_ROW + 1; r <= Math.min(ws.rowCount, FIRST_WEEK_ROW + 80); r++) {
       const dateCell = ws.getCell(r, 14).value;
       const amount = asNumber(ws.getCell(r, 15).value);
       const desc = ws.getCell(r, 16).value;
       if (!dateCell && amount === null && !desc) continue;
-      session.expenses.push({
-        row: r,
-        date: dateCell instanceof Date ? dateCell.toISOString().slice(0, 10) : String(dateCell ?? ''),
-        amount,
-        description: String(desc ?? ''),
-      });
+      const expenseDate = cellDate(dateCell);
+      session.expenses.push({ row: r, date: expenseDate, amount, description: String(desc ?? '') });
     }
 
     data.sessions.push(session);
+  }
+
+  // The non-session sheets (Balance Sheet / Budget / Singles Boards) carry the
+  // workbook's own totals — surface them read-only so nothing is "missing".
+  for (const name of EXTRA_SHEETS) {
+    const ws = wb.worksheets.find((w) => w.name.trim() === name);
+    if (!ws) continue;
+    const rows: string[][] = [];
+    const maxR = Math.min(ws.rowCount, 60);
+    const maxC = Math.min(ws.columnCount, 14);
+    for (let r = 1; r <= maxR; r++) {
+      const line: string[] = [];
+      let any = false;
+      for (let c = 1; c <= maxC; c++) {
+        const cell = ws.getCell(r, c);
+        let v: unknown = cell.value;
+        if (v && typeof v === 'object' && 'formula' in (v as Record<string, unknown>)) {
+          const fv = v as { formula?: unknown; result?: unknown };
+          v = fv.result !== undefined && fv.result !== null ? fv.result : null;
+        }
+        if (v instanceof Date) v = Number.isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 10);
+        const s = v === null || v === undefined ? '' : String(v).slice(0, 40);
+        line.push(s);
+        if (s) any = true;
+      }
+      rows.push(any ? line : []);
+    }
+    data.extras.push({ name, rows });
   }
   return data;
 }
@@ -166,7 +206,10 @@ async function applyEdits(file: string, edits: {
     }
     exp.rows.forEach((row, i) => {
       const r = FIRST_WEEK_ROW + 1 + i;
-      const d = row.date ? new Date(row.date) : null;
+      // Local-noon Date: immune to the UTC/local shift that moves date-only
+      // values a day off in negative-offset timezones.
+      const parts = /^((\d{4})-(\d{2})-(\d{2}))/.exec(row.date ?? '');
+      const d = parts ? new Date(Number(parts[2]), Number(parts[3]) - 1, Number(parts[4]), 12, 0, 0) : null;
       ws.getCell(r, 14).value = d && !Number.isNaN(d.getTime()) ? d : null;
       ws.getCell(r, 14).numFmt = 'mm/dd/yyyy';
       ws.getCell(r, 15).value = row.amount === null ? null : Number(row.amount);
@@ -179,15 +222,20 @@ async function applyEdits(file: string, edits: {
 }
 
 export async function GET() {
-  const file = trackerFile();
-  if (!fs.existsSync(file)) {
-    return NextResponse.json({
-      configured: false,
-      file,
-      message: 'No tracker workbook found at ' + file + ' — copy your tracker xlsx into the vault Trackers folder or set it in Settings.',
-    });
+  try {
+    const file = trackerFile();
+    if (!fs.existsSync(file)) {
+      return NextResponse.json({
+        configured: false,
+        file,
+        message: 'No tracker workbook found at ' + file + ' — copy your tracker xlsx into the vault Trackers folder or set it in Settings.',
+      });
+    }
+    return NextResponse.json(await loadTracker(file));
+  } catch (err) {
+    console.error('[tracker] load failed:', err);
+    return NextResponse.json({ error: String(err).slice(0, 400) }, { status: 500 });
   }
-  return NextResponse.json(await loadTracker(file));
 }
 
 export async function POST(req: NextRequest) {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { PageHeader } from '../PageHeader';
+import { notify } from '../../lib/notify';
 
 /**
  * Financial Tracker — the league finance workbook as a live Jarvis screen.
@@ -20,7 +21,7 @@ interface Week {
 }
 interface Expense { row: number; date: string; amount: number | null; description: string }
 interface Session { name: string; rates: Rate[]; weeks: Week[]; expenses: Expense[] }
-interface TrackerData { file: string; year: string; lo: string; sessions: Session[] }
+interface TrackerData { file: string; year: string; lo: string; extras: { name: string; rows: string[][] }[]; sessions: Session[] }
 
 const TEAM_HEADERS = ['8B Teams', 'Teams 2', 'Teams 3', 'Teams 4'];
 const money = (n: number | null | undefined) => (n === null || n === undefined ? '—' : '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -189,6 +190,50 @@ export function TrackerPage({ onNavigateHome }: { onNavigateHome: () => void }) 
               );
             })}
           </div>
+
+          {/* workbook totals — the Balance Sheet etc., read-only */}
+          {data.extras.length > 0 && (
+            <div className="rounded-lg p-4" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.12)' }}>
+              <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-emerald-400/70 mb-2">Workbook totals (from the workbook's own formulas)</div>
+              {data.extras.map((sheet) => (
+                <div key={sheet.name} className="mb-3">
+                  <div className="font-mono text-[10px] text-cyan-300/80 mb-1">{sheet.name}</div>
+                  <div className="font-mono text-[11px] leading-relaxed text-white/65">
+                    {sheet.rows.filter((r) => r.some((c) => c)).map((r, i) => (
+                      <div key={i}>{r.filter((c) => c).join('   ')}</div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* session totals */}
+          {(() => {
+            const totalCollected = session.weeks.reduce((s, w) => s + (w.total ?? 0), 0);
+            const totalDeposit = session.weeks.reduce((s, w) => s + (w.deposit ?? 0), 0);
+            const totalExpenses = session.expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
+            return (
+              <div className="grid grid-cols-4 gap-3">
+                <div className="rounded-lg p-3" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-white/35 mb-1">Collected</div>
+                  <div className="font-mono text-base text-white">{money(totalCollected)}</div>
+                </div>
+                <div className="rounded-lg p-3" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-white/35 mb-1">Deposited</div>
+                  <div className="font-mono text-base text-white">{money(totalDeposit)}</div>
+                </div>
+                <div className="rounded-lg p-3" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-white/35 mb-1">Expenses</div>
+                  <div className="font-mono text-base text-white">{money(totalExpenses)}</div>
+                </div>
+                <div className="rounded-lg p-3" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-white/35 mb-1">Players Fund balance</div>
+                  <div className="font-mono text-base text-emerald-300">{money(totalDeposit - totalExpenses)}</div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* expenses */}
           <div className="rounded-lg p-4 space-y-2" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.12)' }}>
