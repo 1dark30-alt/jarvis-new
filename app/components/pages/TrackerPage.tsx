@@ -20,7 +20,8 @@ interface Week {
   teams: (number | null)[]; funds: (number | null)[]; total: number | null; deposit: number | null;
 }
 interface Expense { row: number; date: string; amount: number | null; description: string }
-interface Session { name: string; rates: Rate[]; weeks: Week[]; expenses: Expense[] }
+interface Fee { row: number; label: string; value: number | null }
+interface Session { name: string; rates: Rate[]; weeks: Week[]; expenses: Expense[]; fees: Fee[]; grandTotal: { row: number; value: number | null } | null }
 interface TrackerData { file: string; year: string; lo: string; extras: { name: string; rows: string[][] }[]; sessions: Session[] }
 
 const TEAM_HEADERS = ['8B Teams', 'Teams 2', 'Teams 3', 'Teams 4'];
@@ -67,6 +68,7 @@ export function TrackerPage({ onNavigateHome }: { onNavigateHome: () => void }) 
         rates: data.sessions.flatMap((s) => s.rates.map((r) => ({ session: s.name, ...r }))),
         weeks: data.sessions.flatMap((s) => s.weeks.map((w) => ({ session: s.name, row: w.row, teams: w.teams, deposit: w.deposit }))),
         expenses: data.sessions.map((s) => ({ session: s.name, rows: s.expenses.map((e) => ({ date: e.date, amount: e.amount, description: e.description })) })),
+        fees: data.sessions.flatMap((s) => s.fees.map((f) => ({ session: s.name, row: f.row, value: f.value }))),
       }),
     }).then((r) => r.json()) as { ok?: boolean; error?: string };
     setSaving(false);
@@ -165,8 +167,8 @@ export function TrackerPage({ onNavigateHome }: { onNavigateHome: () => void }) 
           {/* weeks */}
           <div className="rounded-lg p-4" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.12)' }}>
             <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-emerald-400/70 mb-2">Weekly funds</div>
-            <div className="grid grid-cols-[110px_repeat(4,80px)_repeat(4,90px)_100px_100px] gap-x-2 font-mono text-[8px] uppercase tracking-widest text-white/30 mb-1">
-              <span>Play ends</span>{TEAM_HEADERS.map((h) => <span key={h} className="text-center">teams</span>)}
+            <div className="grid grid-cols-[110px_110px_repeat(4,80px)_repeat(4,90px)_100px_100px] gap-x-2 font-mono text-[8px] uppercase tracking-widest text-white/30 mb-1">
+              <span>Play ends</span><span>Invoice billed</span>{TEAM_HEADERS.map((h) => <span key={h} className="text-center">teams</span>)}
               <span className="text-center">fund 1</span><span className="text-center">fund 2</span>
               <span className="text-center">fund 3</span><span className="text-center">fund 4</span>
               <span className="text-center">collected</span><span className="text-center">deposit</span>
@@ -178,8 +180,9 @@ export function TrackerPage({ onNavigateHome }: { onNavigateHome: () => void }) 
               });
               const total = computed.reduce((a, b) => a + (b ?? 0), 0) || null;
               return (
-                <div key={w.row} className="grid grid-cols-[110px_repeat(4,80px)_repeat(4,90px)_100px_100px] gap-x-2 items-center py-0.5 border-b border-white/[0.04]">
+                <div key={w.row} className="grid grid-cols-[110px_110px_repeat(4,80px)_repeat(4,90px)_100px_100px] gap-x-2 items-center py-0.5 border-b border-white/[0.04]">
                   <span className="font-mono text-[10px] text-white/60">{new Date(w.date + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                  <span className="font-mono text-[10px] text-white/45">{w.invoice ? new Date(w.invoice + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
                   {w.teams.map((t, ti) => (
                     <input key={ti} type="number" value={t ?? ''} onChange={(e) => update((s) => {
                       const v = e.target.value === '' ? null : Number(e.target.value);
@@ -212,6 +215,32 @@ export function TrackerPage({ onNavigateHome }: { onNavigateHome: () => void }) 
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* entry fees collected (below the totals) */}
+          {session.fees.length > 0 && (
+            <div className="rounded-lg p-4 space-y-2" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.12)' }}>
+              <div className="flex justify-between items-center">
+                <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-emerald-400/70">Entry fees collected</div>
+                <div className="font-mono text-[11px] text-emerald-300">
+                  Grand total: {money(session.fees.reduce((s, f) => s + (f.value ?? 0), 0))}
+                </div>
+              </div>
+              {session.fees.map((f, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="flex-1 min-w-0 truncate text-xs text-white/75">{f.label.replace(' Entry Fees Collected', '')}</span>
+                  <input type="number" value={f.value ?? ''} onChange={(e2) => update((s) => {
+                    const fee = s.fees[i];
+                    fee.value = e2.target.value === '' ? null : Number(e2.target.value);
+                  })} placeholder="0.00"
+                    className="w-28 bg-black/40 border border-white/[0.08] rounded px-2 py-1.5 text-[11px] text-white/80 font-mono text-right" />
+                </div>
+              ))}
+              <div className="flex items-center gap-2 pt-1 border-t border-white/[0.06]">
+                <span className="flex-1 font-mono text-xs text-white/85">Grand Total Collected</span>
+                <span className="font-mono text-emerald-300">{money(session.fees.reduce((s, f) => s + (f.value ?? 0), 0))}</span>
+              </div>
             </div>
           )}
 

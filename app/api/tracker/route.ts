@@ -64,6 +64,8 @@ interface TrackerData {
       teams: (number | null)[]; funds: (number | null)[]; total: number | null; deposit: number | null;
     }[];
     expenses: { row: number; date: string; amount: number | null; description: string }[];
+    fees: { row: number; label: string; value: number | null }[];
+    grandTotal: { row: number; value: number | null } | null;
   }[];
 }
 
@@ -100,7 +102,7 @@ async function loadTracker(file: string): Promise<TrackerData> {
     if (!ws) continue;
     if (!data.year) data.year = String(ws.getCell(1, 1).value ?? '').trim();
     if (!data.lo) data.lo = String(ws.getCell(2, 1).value ?? '').trim();
-    const session: TrackerData['sessions'][0] = { name, rates: [], weeks: [], expenses: [] };
+    const session: TrackerData['sessions'][0] = { name, rates: [], weeks: [], expenses: [], fees: [], grandTotal: null };
 
     for (const r of RATE_ROWS) {
       const label = ws.getCell(r, 1).value;
@@ -116,11 +118,12 @@ async function loadTracker(file: string): Promise<TrackerData> {
       const date = cellDate(dateCell);
       // A week row must carry a real date — TOTAL rows and fragments are skipped.
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      const invoice = cellDate(ws.getCell(r, 2).value);
       const teams = [3, 4, 5, 6].map((c) => asNumber(ws.getCell(r, c).value));
       const funds = [7, 8, 9, 10].map((c) => asNumber(ws.getCell(r, c).value));
       const deposit = asNumber(ws.getCell(r, 12).value);
       const total = funds.reduce((a, b) => a + (b ?? 0), 0) || null;
-      session.weeks.push({ row: r, date, invoice: '', teams, funds, total, deposit });
+      session.weeks.push({ row: r, date, invoice, teams, funds, total, deposit });
     }
 
     for (let r = FIRST_WEEK_ROW + 1; r <= Math.min(ws.rowCount, FIRST_WEEK_ROW + 80); r++) {
@@ -131,6 +134,23 @@ async function loadTracker(file: string): Promise<TrackerData> {
       const expenseDate = cellDate(dateCell);
       session.expenses.push({ row: r, date: expenseDate, amount, description: String(desc ?? '') });
     }
+
+    // Entry-fee collection block (B label + F value, rows ~33-50) and the
+    // Grand Total (SUM formula — read its cached result).
+    let fees: { row: number; label: string; value: number | null }[] = [];
+    let grandTotal: { row: number; value: number | null } | null = null;
+    for (let r = FIRST_WEEK_ROW + 1; r <= Math.min(ws.rowCount, FIRST_WEEK_ROW + 60); r++) {
+      const bCell = ws.getCell(r, 2).value;
+      const label = bCell && typeof bCell === 'object' && 'result' in (bCell as unknown as Record<string, unknown>)
+        ? String((bCell as { result?: unknown }).result ?? '')
+        : String(bCell ?? '');
+      if (!/Entry Fees Collected|Grand Total Collected/i.test(label)) continue;
+      const value = asNumber(ws.getCell(r, 6).value);
+      if (/Grand Total/i.test(label)) grandTotal = { row: r, value };
+      else fees.push({ row: r, label: label.slice(0, 60), value });
+    }
+    session.fees = fees;
+    session.grandTotal = grandTotal;
 
     data.sessions.push(session);
   }
@@ -169,6 +189,7 @@ async function applyEdits(file: string, edits: {
   rates?: { session: string; row: number; label: string; players: number | null; basic: number | null }[];
   weeks?: { session: string; row: number; teams: (number | null)[]; deposit: number | null }[];
   expenses?: { session: string; rows: { date: string; amount: number | null; description: string }[] }[];
+  fees?: { session: string; row: number; value: number | null }[];
 }): Promise<void> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(file);
@@ -188,6 +209,13 @@ async function applyEdits(file: string, edits: {
       ws.getCell(week.row, 3 + idx).value = t === null || t === undefined ? null : Number(t);
     });
     ws.getCell(week.row, 12).value = week.deposit === null || week.deposit === undefined ? null : Number(week.deposit);
+  }
+
+  for (const fee of edits.fees ?? []) {
+    const ws = wb.getWorksheet(fee.session);
+    if (!ws) continue;
+    ws.getCell(fee.row, 6).value = fee.value === null || fee.value === undefined ? null : Number(fee.value);
+    ws.getCell(fee.row, 6).numFmt = '#,##0.00';
   }
 
   for (const exp of edits.expenses ?? []) {
