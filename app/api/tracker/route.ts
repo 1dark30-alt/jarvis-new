@@ -79,6 +79,31 @@ function asNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** ExcelJS cell → clean string, handling Dates, formulas (cached results),
+ *  rich-text arrays, hyperlinks and shared formulas. */
+function cellToString(cell: { value: unknown }): string {
+  const v = cell.value;
+  if (v === null || v === undefined) return '';
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 10);
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    // Formula: use the cached result if present, else show the formula
+    if ('formula' in o) {
+      const r = o.result;
+      return r === null || r === undefined ? '' : String(r).slice(0, 40);
+    }
+    // Rich text: join the text runs
+    if ('richText' in o && Array.isArray(o.richText)) {
+      return (o.richText as { text?: string }[]).map((r) => r.text ?? '').join('').trim();
+    }
+    // Hyperlink / plain text objects
+    if ('text' in o && typeof o.text === 'string') return o.text.trim();
+    if ('result' in o && o.result !== null && o.result !== undefined) return String(o.result);
+    return '';
+  }
+  return String(v);
+}
+
 /** ExcelJS cell → ISO date, handling Dates, shared formulas (result Date),
  *  rich-text and hyperlink objects. Returns '' when there is no real date. */
 function cellDate(v: unknown): string {
@@ -167,14 +192,7 @@ async function loadTracker(file: string): Promise<TrackerData> {
       const line: string[] = [];
       let any = false;
       for (let c = 1; c <= maxC; c++) {
-        const cell = ws.getCell(r, c);
-        let v: unknown = cell.value;
-        if (v && typeof v === 'object' && 'formula' in (v as Record<string, unknown>)) {
-          const fv = v as { formula?: unknown; result?: unknown };
-          v = fv.result !== undefined && fv.result !== null ? fv.result : null;
-        }
-        if (v instanceof Date) v = Number.isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 10);
-        const s = v === null || v === undefined ? '' : String(v).slice(0, 40);
+        const s = cellToString(ws.getCell(r, c));
         line.push(s);
         if (s) any = true;
       }
