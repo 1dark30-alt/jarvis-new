@@ -103,6 +103,9 @@ const PAGE_ITEMS: { page: string; label: string; icon: React.ReactNode }[] = [
   { page: 'scoresheets', label: 'Scoresheets', icon: (
     <svg {...ICON_PROPS}><path d="M5 3h10l4 4v14H5z" /><path d="M9 12h6M9 16h6M9 8h3" /></svg>
   ) },
+  { page: 'tracker', label: 'Tracker', icon: (
+    <svg {...ICON_PROPS}><path d="M4 19V5a1 1 0 0 1 1-1h9l6 6v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" /><path d="M8 8h6M8 12h9M8 16h9" /></svg>
+  ) },
 ];
 
 /**

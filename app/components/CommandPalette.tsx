@@ -44,6 +44,7 @@ const PAGES: { page: string; label: string }[] = [
   { page: 'network-radar', label: 'Network Radar' },
   { page: 'finance', label: 'Finance' },
   { page: 'scoresheets', label: 'APA Scoresheets' },
+  { page: 'tracker', label: 'Financial Tracker' },
 ];
 
 const WIDGETS: { widget: string; label: string }[] = [
