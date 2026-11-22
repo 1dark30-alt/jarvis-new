@@ -44,7 +44,8 @@ export function TrackerPage({ onNavigateHome }: { onNavigateHome: () => void }) 
 
   useEffect(() => { void load(); }, [load]);
 
-  const session = data?.sessions.find((s) => s.name === sessionName) ?? data?.sessions[0] ?? null;
+  const session = data?.sessions.find((s) => s.name === sessionName) ?? null;
+  const extra = data?.extras.find((e) => e.name === sessionName) ?? null;
 
   const update = (mut: (s: Session) => void) => {
     if (!data || !session) return;
@@ -128,12 +129,18 @@ export function TrackerPage({ onNavigateHome }: { onNavigateHome: () => void }) 
 
       {message && <p className="px-6 pt-2 text-[11px] font-mono text-emerald-300">{message}</p>}
 
-      <div className="px-6 pt-3 flex gap-2 shrink-0">
+      <div className="px-6 pt-3 flex flex-wrap gap-2 shrink-0">
         {data?.sessions.map((s) => (
           <button key={s.name} onClick={() => setSessionName(s.name)}
             className={`px-3 py-1.5 rounded font-mono text-[10px] uppercase tracking-widest border transition-all ${
               sessionName === s.name ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-white/[0.04] border-white/[0.08] text-white/40 hover:text-emerald-300'
             }`}>{s.name}</button>
+        ))}
+        {data?.extras.map((e) => (
+          <button key={e.name} onClick={() => setSessionName(e.name)}
+            className={`px-3 py-1.5 rounded font-mono text-[10px] uppercase tracking-widest border transition-all ${
+              sessionName === e.name ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'bg-white/[0.04] border-white/[0.08] text-white/40 hover:text-cyan-300'
+            }`}>{e.name} <span className="text-[8px] text-white/25">view</span></button>
         ))}
         {data && <span className="font-mono text-[10px] text-white/25 self-center ml-2">{data.year} · {data.lo}</span>}
       </div>
@@ -259,6 +266,41 @@ export function TrackerPage({ onNavigateHome }: { onNavigateHome: () => void }) 
                 total expenses: {money(session.expenses.reduce((s, e) => s + (e.amount ?? 0), 0))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Read-only workbook sheets — Balance Sheet / Budget / Singles Boards */}
+      {extra && (
+        <div className="flex-1 min-h-0 overflow-hidden px-6 pb-4 flex flex-col">
+          <div className="font-mono text-[10px] text-cyan-300/80 mb-2 shrink-0">
+            {extra.name} — read-only (edit in the workbook)
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto rounded-lg" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.12)' }}>
+            <table className="border-collapse font-mono text-[10px] whitespace-nowrap">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 bg-[#0d151c] px-2 py-1 text-white/30 border-r border-b border-white/[0.08]">#</th>
+                  {extra.rows[0]?.map((_, ci) => (
+                    <th key={ci} className="bg-[#0d151c] px-2 py-1 text-white/30 border-r border-b border-white/[0.08] text-left">
+                      {String.fromCharCode(65 + ci)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {extra.rows.map((row, ri) => (
+                  <tr key={ri} className="hover:bg-white/[0.03]">
+                    <td className="sticky left-0 bg-[#0d151c] px-2 py-1 text-white/30 border-r border-b border-white/[0.06]">{ri + 1}</td>
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="px-2 py-1 text-white/70 border-r border-b border-white/[0.05] max-w-[220px] truncate" title={cell}>
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
