@@ -201,23 +201,6 @@ export function TrackerPage({ onNavigateHome }: { onNavigateHome: () => void }) 
             })}
           </div>
 
-          {/* workbook totals — the Balance Sheet etc., read-only */}
-          {data.extras.length > 0 && (
-            <div className="rounded-lg p-4" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.12)' }}>
-              <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-emerald-400/70 mb-2">Workbook totals (from the workbook's own formulas)</div>
-              {data.extras.map((sheet) => (
-                <div key={sheet.name} className="mb-3">
-                  <div className="font-mono text-[10px] text-cyan-300/80 mb-1">{sheet.name}</div>
-                  <div className="font-mono text-[11px] leading-relaxed text-white/65">
-                    {sheet.rows.filter((r) => r.some((c) => c)).map((r, i) => (
-                      <div key={i}>{r.filter((c) => c).join('   ')}</div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* entry fees collected (below the totals) */}
           {session.fees.length > 0 && (
             <div className="rounded-lg p-4 space-y-2" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(52,211,153,0.12)' }}>
