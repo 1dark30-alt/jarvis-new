@@ -181,7 +181,7 @@ export function TrackerPage({ onNavigateHome }: { onNavigateHome: () => void }) 
               const total = computed.reduce((a, b) => a + (b ?? 0), 0) || null;
               return (
                 <div key={w.row} className="grid grid-cols-[110px_110px_repeat(4,80px)_repeat(4,90px)_100px_100px] gap-x-2 items-center py-0.5 border-b border-white/[0.04]">
-                  <span className="font-mono text-[10px] text-white/60">{new Date(w.date + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                  <span className="font-mono text-[10px] text-white/60">{new Date(w.date + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   <span className="font-mono text-[10px] text-white/45">{w.invoice ? new Date(w.invoice + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
                   {w.teams.map((t, ti) => (
                     <input key={ti} type="number" value={t ?? ''} onChange={(e) => update((s) => {
