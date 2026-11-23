@@ -150,9 +150,15 @@ const TrackerPage = dynamic(
   { ssr: false }
 );
 
-type JarvisPage = 'home' | 'news' | 'map' | 'calendar' | 'home-assistant' | '3d-printers' | 'music' | 'round-display' | 'spiderman' | 'manufacturing' | 'webshooter' | 'social' | 'audio-test' | 'bounty-hunter' | 'wildcard-draw' | 'gods-eye' | 'disk-map' | 'build-guide' | 'missions' | 'memory' | 'health' | 'dev-mode' | 'market' | 'network-radar' | 'finance' | 'scoresheets' | 'tracker';
+// League Revenue — membership, royalties, investor splits
+const RevenuePage = dynamic(
+  () => import('./components/pages/RevenuePage').then((m) => ({ default: m.RevenuePage })),
+  { ssr: false }
+);
 
-const VALID_PAGES: JarvisPage[] = ['home', 'news', 'map', 'calendar', 'home-assistant', '3d-printers', 'music', 'round-display', 'spiderman', 'manufacturing', 'webshooter', 'social', 'audio-test', 'bounty-hunter', 'wildcard-draw', 'gods-eye', 'disk-map', 'build-guide', 'missions', 'memory', 'health', 'dev-mode', 'market', 'network-radar', 'finance', 'scoresheets', 'tracker'];
+type JarvisPage = 'home' | 'news' | 'map' | 'calendar' | 'home-assistant' | '3d-printers' | 'music' | 'round-display' | 'spiderman' | 'manufacturing' | 'webshooter' | 'social' | 'audio-test' | 'bounty-hunter' | 'wildcard-draw' | 'gods-eye' | 'disk-map' | 'build-guide' | 'missions' | 'memory' | 'health' | 'dev-mode' | 'market' | 'network-radar' | 'finance' | 'scoresheets' | 'tracker' | 'revenue';
+
+const VALID_PAGES: JarvisPage[] = ['home', 'news', 'map', 'calendar', 'home-assistant', '3d-printers', 'music', 'round-display', 'spiderman', 'manufacturing', 'webshooter', 'social', 'audio-test', 'bounty-hunter', 'wildcard-draw', 'gods-eye', 'disk-map', 'build-guide', 'missions', 'memory', 'health', 'dev-mode', 'market', 'network-radar', 'finance', 'scoresheets', 'tracker', 'revenue'];
 
 interface BuildModel { file: string; name: string; sub: string }
 
@@ -346,6 +352,9 @@ export default function Home() {
         )}
         {currentPage === 'tracker' && (
           <TrackerPage key="tracker" onNavigateHome={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'revenue' && (
+          <RevenuePage key="revenue" onNavigateHome={() => setCurrentPage('home')} />
         )}
       </AnimatePresence>
 

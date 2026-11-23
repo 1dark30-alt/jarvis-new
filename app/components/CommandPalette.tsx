@@ -45,6 +45,7 @@ const PAGES: { page: string; label: string }[] = [
   { page: 'finance', label: 'Finance' },
   { page: 'scoresheets', label: 'APA Scoresheets' },
   { page: 'tracker', label: 'Financial Tracker' },
+  { page: 'revenue', label: 'League Revenue' },
 ];
 
 const WIDGETS: { widget: string; label: string }[] = [
