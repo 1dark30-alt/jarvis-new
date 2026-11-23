@@ -22,3 +22,6 @@ apa-nexus-state.json
 __pycache__/
 __pycache__/
 *.pyc
+
+# Financial data (local + vault only, never on GitHub)
+league-revenue.json
