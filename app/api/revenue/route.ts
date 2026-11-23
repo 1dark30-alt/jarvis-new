@@ -31,6 +31,7 @@ interface RevenueStore {
   royaltyPct: number;
   investorPct: number;
   investorPayments: InvestorPayment[];
+  investorName: string;
 }
 
 function load(): RevenueStore {
@@ -41,9 +42,10 @@ function load(): RevenueStore {
       royaltyPct: raw.royaltyPct ?? 20,
       investorPct: raw.investorPct ?? 10,
       investorPayments: raw.investorPayments ?? [],
+      investorName: raw.investorName ?? '',
     };
   } catch {
-    return { membership: [], royaltyPct: 20, investorPct: 10, investorPayments: [] };
+    return { membership: [], royaltyPct: 20, investorPct: 10, investorPayments: [], investorName: '' };
   }
 }
 
@@ -59,6 +61,7 @@ export async function GET() {
     investorPayments: s.investorPayments,
     royaltyPct: s.royaltyPct,
     investorPct: s.investorPct,
+    investorName: s.investorName,
   });
 }
 
@@ -105,6 +108,12 @@ export async function POST(req: NextRequest) {
         s.investorPayments = s.investorPayments.filter((p) => p.id !== String(a.id ?? ''));
         save(s);
         return NextResponse.json({ ok: true });
+      }
+
+      case 'set_investor_name': {
+        s.investorName = String(a.investorName ?? '').trim();
+        save(s);
+        return NextResponse.json({ ok: true, investorName: s.investorName });
       }
 
       case 'set_percentages': {
