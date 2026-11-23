@@ -148,7 +148,7 @@ export function RadialNav({ currentPage }: { currentPage: string }) {
   const RING_OUTER = [
     'news', 'map', 'music', 'social', 'audio-test', 'round-display',
     'spiderman', 'webshooter', 'wildcard-draw', 'gods-eye', 'memory',
-    'developer', 'tracker', 'lock', 'ambient', 'settings',
+    'developer', 'tracker', 'revenue', 'lock', 'ambient', 'settings',
   ];
   const RING_ORDER = [...RING_INNER, ...RING_OUTER];
 
