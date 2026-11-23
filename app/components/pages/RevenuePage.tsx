@@ -64,7 +64,7 @@ export function RevenuePage({ onNavigateHome }: { onNavigateHome: () => void }) 
 
   const totalBasic = basicWeekly.reduce((s, w) => s + w.basicFees, 0);
   const totalRoyalty = totalBasic * (royaltyPct / 100);
-  const totalInvestor = totalBasic * (investorPct / 100);
+  const totalInvestor = (totalBasic - totalRoyalty) * (investorPct / 100);
 
   const saveRevenue = async (body: Record<string, unknown>) => {
     const res = await fetch('/api/revenue', {
@@ -157,7 +157,7 @@ export function RevenuePage({ onNavigateHome }: { onNavigateHome: () => void }) 
                 <span className="font-mono text-[10px] text-white/40 w-24 shrink-0">{w.date.slice(0, 10)}</span>
                 <span className="text-white/30 text-[10px] font-mono">{w.session}</span>
                 <span className="flex-1 text-right font-mono text-white/80">{money(w.basicFees)}</span>
-                <span className="font-mono text-cyan-300 w-20 text-right">{money(w.basicFees * (investorPct / 100))}</span>
+                <span className="font-mono text-cyan-300 w-20 text-right">{money((w.basicFees - w.basicFees * (royaltyPct / 100)) * (investorPct / 100))}</span>
                 <span className="font-mono text-white/40 w-20 text-right">{money(w.basicFees * (royaltyPct / 100))} royalty</span>
               </div>
             ))}
