@@ -9,15 +9,15 @@ import { notify } from '../../lib/notify';
  * League Revenue — three revenue trackers on one screen:
  *
  *   Membership — when players pay their membership fees
- *   Royalties  — 20% of the Basic Weekly fees (editable %)
+ *   Royalties  — 20% of the Basic Weekly fees
  *   Investor   — 10% of the Basic Weekly fees minus the Royalty
  *
- * The weekly fees come from the Financial Tracker's sessions (the K column
- * = total collected per week). All data lives in the vault — synced.
+ * The Basic Weekly fees = Basic Weekly rate × team count (from the
+ * Financial Tracker). The percentages are editable.
  */
 
 interface Week { row: number; date: string; teams: (number | null)[]; total: number | null; deposit: number | null }
-interface Session { name: string; weeks: Week[] }
+interface Session { name: string; weeks: Week[]; rates?: { label: string; players: number | null; basic: number | null }[] }
 interface MembershipPayment { id: string; player: string; date: string; amount: number; season: string }
 
 type Tab = 'membership' | 'royalties' | 'investor';
@@ -30,6 +30,7 @@ export function RevenuePage({ onNavigateHome }: { onNavigateHome: () => void }) 
   const [membership, setMembership] = useState<MembershipPayment[]>([]);
   const [royaltyPct, setRoyaltyPct] = useState(20);
   const [investorPct, setInvestorPct] = useState(10);
+  const [basicRate, setBasicRate] = useState(25);
   const [newPlayer, setNewPlayer] = useState('');
   const [newAmount, setNewAmount] = useState('');
   const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
@@ -43,18 +44,29 @@ export function RevenuePage({ onNavigateHome }: { onNavigateHome: () => void }) 
     setRoyaltyPct(rev.royaltyPct ?? 20);
     setInvestorPct(rev.investorPct ?? 10);
     setSessions(trk.sessions ?? []);
+    // Pull the Basic Weekly rate from the first session that has one
+    for (const s of trk.sessions ?? []) {
+      const rate = s.rates?.find((r) => r.basic !== null);
+      if (rate?.basic) { setBasicRate(rate.basic); break; }
+    }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
 
   const allWeeks = sessions.flatMap((s) => s.weeks.map((w) => ({ ...w, session: s.name })));
-  const weeksWithFees = allWeeks.filter((w) => w.total !== null && w.total > 0);
+  const activeWeeks = allWeeks.filter((w) => w.teams.some((t) => t !== null));
 
-  const totalFees = weeksWithFees.reduce((s, w) => s + (w.total ?? 0), 0);
-  const totalRoyalties = totalFees * (royaltyPct / 100);
-  const totalInvestor = totalFees * (investorPct / 100);
+  // Basic Weekly fees per week = Basic Weekly rate × team count
+  const basicWeekly = activeWeeks.map((w) => {
+    const teams = w.teams.find((t) => t !== null) ?? 0;
+    return { ...w, basicFees: teams * basicRate };
+  });
 
-  const saveMembership = async (body: Record<string, unknown>) => {
+  const totalBasic = basicWeekly.reduce((s, w) => s + w.basicFees, 0);
+  const totalRoyalty = totalBasic * (royaltyPct / 100);
+  const totalInvestor = totalBasic * (investorPct / 100);
+
+  const saveRevenue = async (body: Record<string, unknown>) => {
     const res = await fetch('/api/revenue', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -78,21 +90,85 @@ export function RevenuePage({ onNavigateHome }: { onNavigateHome: () => void }) 
         accent="cyan"
         right={
           <span className="font-mono text-[9px] uppercase tracking-widest text-white/30">
-            Royalties {royaltyPct}% · Investor {investorPct}%
+            Basic Weekly: {money(basicRate)}/team
           </span>
         }
       />
 
       <div className="px-6 pt-3 flex gap-2 shrink-0">
-        {(['membership', 'royalties', 'investor'] as Tab[]).map((t) => (
+        {(['royalties', 'investor', 'membership'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-3 py-1.5 rounded font-mono text-[10px] uppercase tracking-widest border transition-all ${
               tab === t ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'bg-white/[0.04] border-white/[0.08] text-white/40 hover:text-cyan-300'
-            }`}>{t === 'membership' ? 'Membership' : t === 'royalties' ? 'Royalties' : 'Investor'}</button>
+            }`}>{t === 'royalties' ? 'Royalties' : t === 'investor' ? 'Investor' : 'Membership'}</button>
         ))}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
+        {/* ── Royalties ── */}
+        {tab === 'royalties' && (
+          <div className="rounded-lg p-4 space-y-3" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(34,211,238,0.12)' }}>
+            <div className="flex items-center justify-between">
+              <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-cyan-400/70">Royalties — {royaltyPct}% of Basic Weekly fees</div>
+              <div className="font-mono text-sm text-emerald-300">{money(totalRoyalty)} total</div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[10px] text-white/40">Rate</span>
+              <input type="number" value={royaltyPct} onChange={(e) => {
+                const v = Number(e.target.value);
+                setRoyaltyPct(v);
+                void saveRevenue({ op: 'set_percentages', royaltyPct: v, investorPct });
+              }} className="w-16 bg-black/40 border border-white/[0.08] rounded px-2 py-1 text-center text-xs text-white/80 font-mono" />
+              <span className="text-white/30 text-xs">%</span>
+            </div>
+            {basicWeekly.map((w, i) => (
+              <div key={i} className="flex items-center gap-3 py-1.5 border-b border-white/[0.04] text-sm">
+                <span className="font-mono text-[10px] text-white/40 w-24 shrink-0">{w.date.slice(0, 10)}</span>
+                <span className="text-white/30 text-[10px] font-mono">{w.session}</span>
+                <span className="flex-1 text-right font-mono text-white/80">{money(w.basicFees)}</span>
+                <span className="font-mono text-emerald-300 w-20 text-right">{money(w.basicFees * (royaltyPct / 100))}</span>
+              </div>
+            ))}
+            <div className="flex justify-between pt-2 border-t border-white/[0.08] font-mono text-sm">
+              <span className="text-white/60">Total royalties</span>
+              <span className="text-emerald-300">{money(totalBasic * (royaltyPct / 100))}</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── Investor ── */}
+        {tab === 'investor' && (
+          <div className="rounded-lg p-4 space-y-3" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(34,211,238,0.12)' }}>
+            <div className="flex items-center justify-between">
+              <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-cyan-400/70">Investor — {investorPct}% of Basic Weekly fees minus Royalties</div>
+              <div className="font-mono text-sm text-cyan-300">{money(totalInvestor)} total</div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[10px] text-white/40">Rate</span>
+              <input type="number" value={investorPct} onChange={(e) => {
+                const v = Number(e.target.value);
+                setInvestorPct(v);
+                void saveRevenue({ op: 'set_percentages', royaltyPct, investorPct: v });
+              }} className="w-16 bg-black/40 border border-white/[0.08] rounded px-2 py-1 text-center text-xs text-white/80 font-mono" />
+              <span className="text-white/30 text-xs">%</span>
+            </div>
+            {basicWeekly.map((w, i) => (
+              <div key={i} className="flex items-center gap-3 py-1.5 border-b border-white/[0.04] text-sm">
+                <span className="font-mono text-[10px] text-white/40 w-24 shrink-0">{w.date.slice(0, 10)}</span>
+                <span className="text-white/30 text-[10px] font-mono">{w.session}</span>
+                <span className="flex-1 text-right font-mono text-white/80">{money(w.basicFees)}</span>
+                <span className="font-mono text-cyan-300 w-20 text-right">{money(w.basicFees * (investorPct / 100))}</span>
+                <span className="font-mono text-white/40 w-20 text-right">{money(w.basicFees * (royaltyPct / 100))} royalty</span>
+              </div>
+            ))}
+            <div className="flex justify-between pt-2 border-t border-white/[0.08] font-mono text-sm">
+              <span className="text-white/60">Total investor</span>
+              <span className="text-cyan-300">{money(totalBasic * (investorPct / 100))}</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── Membership ── */}
         {tab === 'membership' && (
           <>
             <div className="rounded-lg p-4 space-y-2" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(34,211,238,0.12)' }}>
@@ -106,7 +182,7 @@ export function RevenuePage({ onNavigateHome }: { onNavigateHome: () => void }) 
                   className="w-24 bg-black/40 border border-white/[0.08] rounded px-2 py-1.5 text-xs text-white/80 font-mono text-right" />
                 <button onClick={() => {
                   if (!newPlayer.trim() || !newAmount) { notify('Revenue', 'Player and amount are required.', 'warn'); return; }
-                  void saveMembership({ op: 'add_membership', player: newPlayer.trim(), amount: Number(newAmount), date: newDate });
+                  void saveRevenue({ op: 'add_membership', player: newPlayer.trim(), amount: Number(newAmount), date: newDate });
                   setNewPlayer(''); setNewAmount('');
                 }} className="px-3 py-1.5 rounded font-mono text-[10px] uppercase tracking-widest bg-cyan-500/10 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/20">+ Add</button>
               </div>
@@ -119,61 +195,12 @@ export function RevenuePage({ onNavigateHome }: { onNavigateHome: () => void }) 
                   <span className="font-mono text-[10px] text-white/35 w-24 shrink-0">{m.date}</span>
                   <span className="flex-1 min-w-0 truncate text-white/80">{m.player}</span>
                   <span className="font-mono text-cyan-300">{money(m.amount)}</span>
-                  <button onClick={() => void saveMembership({ op: 'remove_membership', id: m.id })}
+                  <button onClick={() => void saveRevenue({ op: 'remove_membership', id: m.id })}
                     className="px-1 text-white/25 hover:text-red-300 text-xs">✕</button>
                 </div>
               ))}
             </div>
           </>
-        )}
-
-        {tab === 'royalties' && (
-          <div className="rounded-lg p-4 space-y-2" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(34,211,238,0.12)' }}>
-            <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-emerald-400/70 mb-2">
-              Royalties — {royaltyPct}% of the Basic Weekly fees
-            </div>
-            {weeksWithFees.map((w, i) => {
-              const royalty = (w.total ?? 0) * (royaltyPct / 100);
-              return (
-                <div key={i} className="flex items-center gap-3 py-1.5 border-b border-white/[0.04] text-sm">
-                  <span className="font-mono text-[10px] text-white/40 w-24 shrink-0">{w.date.slice(0, 10)}</span>
-                  <span className="text-white/30 text-[10px] font-mono">{w.session}</span>
-                  <span className="flex-1 text-right font-mono text-white/80">{money(w.total)}</span>
-                  <span className="font-mono text-emerald-300 w-24 text-right">{money(royalty)}</span>
-                </div>
-              );
-            })}
-            <div className="flex justify-between pt-2 border-t border-white/[0.08] font-mono text-sm">
-              <span className="text-white/60">Total royalties</span>
-              <span className="text-emerald-300">{money(weeksWithFees.reduce((s, w) => s + (w.total ?? 0) * (royaltyPct / 100), 0))}</span>
-            </div>
-          </div>
-        )}
-
-        {tab === 'investor' && (
-          <div className="rounded-lg p-4 space-y-2" style={{ background: 'rgba(10,15,20,0.7)', border: '1px solid rgba(34,211,238,0.12)' }}>
-            <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-emerald-400/70 mb-2">
-              Investor — {investorPct}% of the Basic Weekly fees minus Royalties
-            </div>
-            {weeksWithFees.map((w, i) => {
-              const total = w.total ?? 0;
-              const royalty = total * (royaltyPct / 100);
-              const investor = total * (investorPct / 100);
-              return (
-                <div key={i} className="flex items-center gap-3 py-1.5 border-b border-white/[0.04] text-sm">
-                  <span className="font-mono text-[10px] text-white/40 w-24 shrink-0">{w.date.slice(0, 10)}</span>
-                  <span className="text-white/30 text-[10px] font-mono">{w.session}</span>
-                  <span className="flex-1 text-right font-mono text-white/80">{money(total)}</span>
-                  <span className="font-mono text-cyan-300 w-24 text-right">{money(investor)}</span>
-                  <span className="font-mono text-white/40 w-20 text-right">{money(royalty)}</span>
-                </div>
-              );
-            })}
-            <div className="flex justify-between pt-2 border-t border-white/[0.08] font-mono text-sm">
-              <span className="text-white/60">Total investor</span>
-              <span className="text-cyan-300">{money(weeksWithFees.reduce((s, w) => s + (w.total ?? 0) * (investorPct / 100), 0))}</span>
-            </div>
-          </div>
         )}
       </div>
     </motion.div>
