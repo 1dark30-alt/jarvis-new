@@ -625,8 +625,12 @@ function createWindow() {
             mainWindow?.webContents.openDevTools();
         }
     });
-    // Open external links in the default browser
+    // Open external links in the default browser; allow blank popups
+    // (document.write targets, e.g. the investor invoice statement)
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        if (url === 'about:blank' || url === 'about:blank#blocked') {
+            return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, width: 920, height: 1000 } };
+        }
         electron_1.shell.openExternal(url);
         return { action: 'deny' };
     });
