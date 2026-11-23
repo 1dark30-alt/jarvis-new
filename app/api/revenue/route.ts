@@ -24,10 +24,13 @@ interface MembershipPayment {
   season: string;
 }
 
+interface InvestorPayment { id: string; date: string; amount: number; note: string }
+
 interface RevenueStore {
   membership: MembershipPayment[];
   royaltyPct: number;
   investorPct: number;
+  investorPayments: InvestorPayment[];
 }
 
 function load(): RevenueStore {
@@ -37,9 +40,10 @@ function load(): RevenueStore {
       membership: raw.membership ?? [],
       royaltyPct: raw.royaltyPct ?? 20,
       investorPct: raw.investorPct ?? 10,
+      investorPayments: raw.investorPayments ?? [],
     };
   } catch {
-    return { membership: [], royaltyPct: 20, investorPct: 10 };
+    return { membership: [], royaltyPct: 20, investorPct: 10, investorPayments: [] };
   }
 }
 
@@ -52,6 +56,7 @@ export async function GET() {
   const s = load();
   return NextResponse.json({
     membership: s.membership,
+    investorPayments: s.investorPayments,
     royaltyPct: s.royaltyPct,
     investorPct: s.investorPct,
   });
@@ -80,6 +85,24 @@ export async function POST(req: NextRequest) {
       case 'remove_membership': {
         const id = String(a.id ?? '');
         s.membership = s.membership.filter((m) => m.id !== id);
+        save(s);
+        return NextResponse.json({ ok: true });
+      }
+
+      case 'pay_investor': {
+        const id = `ip${Date.now().toString(36)}`;
+        s.investorPayments.push({
+          id,
+          date: String(a.date ?? new Date().toISOString().slice(0, 10)),
+          amount: Number(a.amount ?? 0),
+          note: String(a.note ?? ''),
+        });
+        save(s);
+        return NextResponse.json({ ok: true, id });
+      }
+
+      case 'remove_investor_payment': {
+        s.investorPayments = s.investorPayments.filter((p) => p.id !== String(a.id ?? ''));
         save(s);
         return NextResponse.json({ ok: true });
       }
