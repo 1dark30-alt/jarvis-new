@@ -11,9 +11,39 @@ export const dynamic = 'force-dynamic';
  * page from the Financial Tracker's collected totals.
  */
 
-function dataFile(): string {
+function localFile(): string {
   const base = process.env.JARVIS_DATA_DIR || process.cwd();
   return path.join(base, 'league-revenue.json');
+}
+
+function settingsFile(): string {
+  const base = process.env.JARVIS_DATA_DIR || process.cwd();
+  return path.join(base, 'jarvis-server-settings.json');
+}
+
+/**
+ * The revenue store lives in the Obsidian vault (alongside the Financial
+ * Tracker) so the desktop and laptop share one copy. Falls back to a local
+ * file when no vault is configured, and migrates the legacy local file into
+ * the vault on first read.
+ */
+function dataFile(): string {
+  try {
+    const raw = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) as Record<string, unknown>;
+    const inner = (typeof raw.jarvis_settings === 'string'
+      ? JSON.parse(raw.jarvis_settings)
+      : raw.jarvis_settings ?? {}) as Record<string, unknown>;
+    const vault = String(inner.obsidian_vault_path ?? '').trim();
+    if (vault) {
+      const vaultFile = path.join(vault, 'APA League', 'Trackers', 'league-revenue.json');
+      if (!fs.existsSync(vaultFile) && fs.existsSync(localFile())) {
+        fs.mkdirSync(path.dirname(vaultFile), { recursive: true });
+        fs.copyFileSync(localFile(), vaultFile);
+      }
+      return vaultFile;
+    }
+  } catch { /* fall back to local */ }
+  return localFile();
 }
 
 interface MembershipPayment {
